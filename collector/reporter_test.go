@@ -20,8 +20,9 @@ const reportChannelSize = 10
 const reportTimeoutMs = 5000
 
 type testServer struct {
-	listener net.Listener
-	ch       chan string
+	listener     net.Listener
+	ch           chan string
+	responseCode int
 }
 
 func (ts *testServer) getReportURL() string {
@@ -61,7 +62,7 @@ func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/report":
 		ts.ch <- r.PostFormValue("d")
-		w.Write([]byte("got it"))
+		w.WriteHeader(ts.responseCode)
 	default:
 		http.NotFound(w, r)
 	}
@@ -74,7 +75,8 @@ func createConfig() *config {
 
 func initTest(t *testing.T, cfg *config) (*testServer, *reporter) {
 	ts := &testServer{
-		ch: make(chan string, reportChannelSize),
+		ch:           make(chan string, reportChannelSize),
+		responseCode: 200,
 	}
 	ts.start(t)
 
@@ -85,10 +87,14 @@ func initTest(t *testing.T, cfg *config) (*testServer, *reporter) {
 	return ts, r
 }
 
+func cleanUpTest(ts *testServer, r *reporter) {
+	ts.stop()
+	r.stop()
+}
+
 func TestReport(t *testing.T) {
 	ts, r := initTest(t, createConfig())
-	defer ts.stop()
-	defer r.stop()
+	defer cleanUpTest(ts, r)
 
 	s := &common.Sample{time.Unix(123, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s)
@@ -112,8 +118,7 @@ func TestBatching(t *testing.T) {
 	cfg := createConfig()
 	cfg.ReportBatchSize = 3
 	ts, r := initTest(t, cfg)
-	defer ts.stop()
-	defer r.stop()
+	defer cleanUpTest(ts, r)
 
 	samples := make([]*common.Sample, cfg.ReportBatchSize*3+1)
 	for i := range samples {
@@ -128,7 +133,27 @@ func TestBatching(t *testing.T) {
 		exp := common.JoinSamples(samples[start:end])
 		str := ts.waitForReport(t)
 		if str != exp {
-			t.Errorf("Expected %q for batch %v; saw saw %q", exp, i, str)
+			t.Errorf("Expected %q for batch %v; saw %q", exp, i, str)
 		}
+	}
+}
+
+func TestRetry(t *testing.T) {
+	ts, r := initTest(t, createConfig())
+	defer cleanUpTest(ts, r)
+
+	ts.responseCode = 500
+	s0 := &common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
+	r.reportSample(s0)
+	ts.waitForReport(t)
+
+	ts.responseCode = 200
+	s1 := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
+	r.reportSample(s1)
+	r.triggerRetryTimeout()
+	str := ts.waitForReport(t)
+	exp := common.JoinSamples([]*common.Sample{s0, s1})
+	if str != exp {
+		t.Errorf("Expected %q on retry; saw %q", exp, str)
 	}
 }

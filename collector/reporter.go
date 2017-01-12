@@ -78,10 +78,7 @@ func (r *reporter) reportSamples(samples []*common.Sample) {
 }
 
 func (r *reporter) triggerRetryTimeout() {
-	// Create a new channel so the real timeout is ignored later.
-	ch := r.retryTimeout
-	r.retryTimeout = make(chan bool, 2)
-	ch <- true
+	r.retryTimeout <- true
 }
 
 func (r *reporter) processSamples() {
@@ -141,6 +138,7 @@ func (r *reporter) processSamples() {
 }
 
 func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
+	// FIXME: Timeouts?
 	resp, err := http.PostForm(r.cfg.ReportURL, url.Values{"d": {common.JoinSamples(samples)}})
 	if err != nil {
 		return err
