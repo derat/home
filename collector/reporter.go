@@ -21,12 +21,17 @@ type reporter struct {
 	samples []*common.Sample
 
 	// Used to signal the reporter goroutine when samples is non-empty.
-	// Protects samples.
+	// Protects samples and stopping.
 	cond *sync.Cond
 
+	// Used by the reporter goroutine to delay retries after errors.
 	retryTimeout chan bool
 
+	// Set to true to tell the reporter goroutine should exit.
 	stopping bool
+
+	// Used to wait for the reporter goroutine to exit when stop is called.
+	wg sync.WaitGroup
 }
 
 func newReporter(cfg *config) *reporter {
@@ -45,6 +50,7 @@ func newReporter(cfg *config) *reporter {
 }
 
 func (r *reporter) start() {
+	r.wg.Add(1)
 	go r.processSamples()
 }
 
@@ -54,6 +60,7 @@ func (r *reporter) stop() {
 	r.cond.L.Unlock()
 	r.cond.Signal()
 	r.triggerRetryTimeout()
+	r.wg.Wait()
 }
 
 func (r *reporter) reportSample(s *common.Sample) {
@@ -86,6 +93,7 @@ func (r *reporter) processSamples() {
 		if r.stopping {
 			r.cfg.Logger.Printf("Reporter loop exiting")
 			// FIXME: Rewrite backing file?
+			r.wg.Done()
 			return
 		}
 		samples := r.samples
