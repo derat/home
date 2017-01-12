@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -58,9 +57,15 @@ func (r *reporter) stop() {
 }
 
 func (r *reporter) reportSample(s *common.Sample) {
-	r.cfg.Logger.Printf("Queuing %v", s.String())
+	r.reportSamples([]*common.Sample{s})
+}
+
+func (r *reporter) reportSamples(samples []*common.Sample) {
+	for _, s := range samples {
+		r.cfg.Logger.Printf("Queuing %v", s.String())
+	}
 	r.cond.L.Lock()
-	r.samples = append(r.samples, s)
+	r.samples = append(r.samples, samples...)
 	r.cond.L.Unlock()
 	r.cond.Signal()
 }
@@ -128,11 +133,7 @@ func (r *reporter) processSamples() {
 }
 
 func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
-	data := make([]string, len(samples))
-	for i, s := range samples {
-		data[i] = s.String()
-	}
-	resp, err := http.PostForm(r.cfg.ReportURL, url.Values{"d": {strings.Join(data, "\n")}})
+	resp, err := http.PostForm(r.cfg.ReportURL, url.Values{"d": {common.JoinSamples(samples)}})
 	if err != nil {
 		return err
 	} else if resp.StatusCode != 200 {

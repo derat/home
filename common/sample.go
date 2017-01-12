@@ -49,3 +49,12 @@ func (s *Sample) Parse(str string, now time.Time) error {
 	}
 	return nil
 }
+
+// JoinSamples joins the string representations of samples with newlines.
+func JoinSamples(samples []*Sample) string {
+	d := make([]string, len(samples))
+	for i, s := range samples {
+		d[i] = s.String()
+	}
+	return strings.Join(d, "\n")
+}
