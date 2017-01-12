@@ -17,6 +17,8 @@ import (
 type reporter struct {
 	cfg *config
 
+	client *http.Client
+
 	// Samples that have not yet been sent to the server.
 	samples []*common.Sample
 
@@ -37,6 +39,7 @@ type reporter struct {
 func newReporter(cfg *config) *reporter {
 	r := &reporter{
 		cfg:          cfg,
+		client:       &http.Client{Timeout: time.Duration(cfg.ReportTimeoutMs) * time.Millisecond},
 		samples:      make([]*common.Sample, 0),
 		cond:         sync.NewCond(new(sync.Mutex)),
 		retryTimeout: make(chan bool, 2),
@@ -123,9 +126,9 @@ func (r *reporter) processSamples() {
 		r.cond.L.Unlock()
 
 		if gotError {
-			r.cfg.Logger.Printf("Sleeping for %v ms after failure", r.cfg.ReportRetryDelayMs)
+			r.cfg.Logger.Printf("Sleeping for %v ms after failure", r.cfg.ReportRetryMs)
 			go func(ch chan bool) {
-				time.Sleep(time.Duration(r.cfg.ReportRetryDelayMs) * time.Millisecond)
+				time.Sleep(time.Duration(r.cfg.ReportRetryMs) * time.Millisecond)
 				ch <- true
 			}(r.retryTimeout)
 
@@ -138,8 +141,7 @@ func (r *reporter) processSamples() {
 }
 
 func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
-	// FIXME: Timeouts?
-	resp, err := http.PostForm(r.cfg.ReportURL, url.Values{"d": {common.JoinSamples(samples)}})
+	resp, err := r.client.PostForm(r.cfg.ReportURL, url.Values{"d": {common.JoinSamples(samples)}})
 	if err != nil {
 		return err
 	} else if resp.StatusCode != 200 {

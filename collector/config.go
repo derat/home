@@ -17,8 +17,11 @@ type config struct {
 	// Maximum number of samples to report in a single request.
 	ReportBatchSize int
 
+	// Client timeout when communicating with server, in milliseconds.
+	ReportTimeoutMs int
+
 	// Time to wait before retrying on failure, in milliseconds.
-	ReportRetryDelayMs int
+	ReportRetryMs int
 
 	Logger *log.Logger
 }
@@ -26,7 +29,8 @@ type config struct {
 func readConfig(path string, logger *log.Logger) (*config, error) {
 	cfg := &config{}
 	cfg.ReportBatchSize = 10
-	cfg.ReportRetryDelayMs = 10000
+	cfg.ReportTimeoutMs = 10000
+	cfg.ReportRetryMs = 10000
 	cfg.Logger = logger
 	// FIXME: Read path.
 	return cfg, nil

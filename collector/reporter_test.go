@@ -20,9 +20,10 @@ const reportChannelSize = 10
 const reportTimeoutMs = 5000
 
 type testServer struct {
-	listener     net.Listener
-	ch           chan string
-	responseCode int
+	listener      net.Listener
+	ch            chan string
+	responseCode  int
+	responseDelay time.Duration
 }
 
 func (ts *testServer) getReportURL() string {
@@ -62,6 +63,9 @@ func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/report":
 		ts.ch <- r.PostFormValue("d")
+		if ts.responseDelay > 0 {
+			time.Sleep(ts.responseDelay)
+		}
 		w.WriteHeader(ts.responseCode)
 	default:
 		http.NotFound(w, r)
@@ -155,5 +159,24 @@ func TestRetry(t *testing.T) {
 	exp := common.JoinSamples([]*common.Sample{s0, s1})
 	if str != exp {
 		t.Errorf("Expected %q on retry; saw %q", exp, str)
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	cfg := createConfig()
+	cfg.ReportTimeoutMs = 100
+	ts, r := initTest(t, cfg)
+	defer cleanUpTest(ts, r)
+	ts.responseDelay = time.Duration(cfg.ReportTimeoutMs+50) * time.Millisecond
+
+	s := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
+	r.reportSample(s)
+	ts.waitForReport(t)
+
+	ts.responseDelay = 0
+	r.triggerRetryTimeout()
+	str := ts.waitForReport(t)
+	if str != s.String() {
+		t.Errorf("Expected %q on retry; saw %q", s.String(), str)
 	}
 }
