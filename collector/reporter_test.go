@@ -6,6 +6,7 @@ package collector
 import (
 	"erat.org/home/common"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
@@ -14,6 +15,8 @@ import (
 	"testing"
 	"time"
 )
+
+const verbose = false
 
 const reportPath = "/report"
 const reportChannelSize = 10
@@ -73,8 +76,30 @@ func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func createConfig() *config {
-	cfg, _ := readConfig("", log.New(os.Stderr, "", log.LstdFlags))
+	out := ioutil.Discard
+	if verbose {
+		out = os.Stderr
+	}
+
+	cfg, _ := readConfig("", log.New(out, "", log.LstdFlags))
 	return cfg
+}
+
+func createTempFile() string {
+	f, err := ioutil.TempFile("", "reporter_test.")
+	if err != nil {
+		panic(err)
+	}
+	f.Close()
+	return f.Name()
+}
+
+func getFileSize(p string) int64 {
+	fi, err := os.Stat(p)
+	if err != nil {
+		panic(err)
+	}
+	return fi.Size()
 }
 
 func initTest(t *testing.T, cfg *config) (*testServer, *reporter) {
@@ -178,5 +203,64 @@ func TestTimeout(t *testing.T) {
 	str := ts.waitForReport(t)
 	if str != s.String() {
 		t.Errorf("Expected %q on retry; saw %q", s.String(), str)
+	}
+}
+
+func TestBackingFile(t *testing.T) {
+	cfg := createConfig()
+	cfg.BackingFile = createTempFile()
+	defer os.Remove(cfg.BackingFile)
+	ts, r := initTest(t, cfg)
+	defer ts.stop()
+
+	ts.responseCode = 500
+	s0 := &common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
+	r.reportSample(s0)
+	ts.waitForReport(t)
+	r.triggerRetryTimeout()
+	ts.waitForReport(t)
+	if getFileSize(cfg.BackingFile) == 0 {
+		t.Errorf("Backing file not written immediately after failure")
+	}
+	r.stop()
+
+	// A new reporter should load the backing file and try to report the sample
+	// again immediately.
+	r = newReporter(cfg)
+	r.start()
+	str := ts.waitForReport(t)
+	if str != s0.String() {
+		t.Errorf("Expected %q after restart; saw %q", s0.String(), str)
+	}
+
+	// Add a second sample and check that the two are reported in-order next
+	// time.
+	s1 := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
+	r.reportSample(s1)
+	r.triggerRetryTimeout()
+	str = ts.waitForReport(t)
+	exp := common.JoinSamples([]*common.Sample{s0, s1})
+	if str != exp {
+		t.Errorf("Expected %q on retry; saw %q", exp, str)
+	}
+
+	// Add a third sample and stop the reporter before it gets a chance to
+	// retry.
+	s2 := &common.Sample{time.Unix(2, 0), "SOURCE", "NAME", 10.0}
+	r.reportSample(s2)
+	r.stop()
+
+	// A new reporter should report all three samples.
+	ts.responseCode = 200
+	r = newReporter(cfg)
+	r.start()
+	str = ts.waitForReport(t)
+	exp = common.JoinSamples([]*common.Sample{s0, s1, s2})
+	if str != exp {
+		t.Errorf("Expected %q on retry; saw %q", exp, str)
+	}
+	r.stop()
+	if getFileSize(cfg.BackingFile) != 0 {
+		t.Errorf("Backing file not cleared after successful write")
 	}
 }

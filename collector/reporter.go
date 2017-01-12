@@ -4,15 +4,20 @@
 package collector
 
 import (
+	"encoding/json"
 	"erat.org/home/common"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 )
+
+const tempBackingFileExtension = ".new"
 
 type reporter struct {
 	cfg *config
@@ -20,7 +25,10 @@ type reporter struct {
 	client *http.Client
 
 	// Samples that have not yet been sent to the server.
-	samples []*common.Sample
+	queuedSamples []*common.Sample
+
+	// Samples that are listed in the backing file.
+	backingFileSamples []*common.Sample
 
 	// Used to signal the reporter goroutine when samples is non-empty.
 	// Protects samples and stopping.
@@ -38,15 +46,22 @@ type reporter struct {
 
 func newReporter(cfg *config) *reporter {
 	r := &reporter{
-		cfg:          cfg,
-		client:       &http.Client{Timeout: time.Duration(cfg.ReportTimeoutMs) * time.Millisecond},
-		samples:      make([]*common.Sample, 0),
-		cond:         sync.NewCond(new(sync.Mutex)),
-		retryTimeout: make(chan bool, 2),
+		cfg:                cfg,
+		client:             &http.Client{Timeout: time.Duration(cfg.ReportTimeoutMs) * time.Millisecond},
+		queuedSamples:      make([]*common.Sample, 0),
+		backingFileSamples: make([]*common.Sample, 0),
+		cond:               sync.NewCond(new(sync.Mutex)),
+		retryTimeout:       make(chan bool, 2),
 	}
 
-	if _, err := os.Stat(cfg.BackingPath); err == nil {
-		// FIXME: Read queued samples.
+	if _, err := os.Stat(cfg.BackingFile); err == nil {
+		samples, err := r.readSamplesFromBackingFile()
+		if err != nil {
+			r.cfg.Logger.Printf("Failed to read samples from %v: %v", cfg.BackingFile, err)
+		} else {
+			r.queuedSamples = samples
+			r.backingFileSamples = samples
+		}
 	}
 
 	return r
@@ -75,7 +90,7 @@ func (r *reporter) reportSamples(samples []*common.Sample) {
 		r.cfg.Logger.Printf("Queuing %v", s.String())
 	}
 	r.cond.L.Lock()
-	r.samples = append(r.samples, samples...)
+	r.queuedSamples = append(r.queuedSamples, samples...)
 	r.cond.L.Unlock()
 	r.cond.Signal()
 }
@@ -87,17 +102,19 @@ func (r *reporter) triggerRetryTimeout() {
 func (r *reporter) processSamples() {
 	for {
 		r.cond.L.Lock()
-		for len(r.samples) == 0 && !r.stopping {
+		for len(r.queuedSamples) == 0 && !r.stopping {
 			r.cond.Wait()
 		}
 		if r.stopping {
 			r.cfg.Logger.Printf("Reporter loop exiting")
-			// FIXME: Rewrite backing file?
+			if err := r.writeSamplesToBackingFile(r.queuedSamples); err != nil {
+				r.cfg.Logger.Printf("Failed to write samples: %v", err)
+			}
 			r.wg.Done()
 			return
 		}
-		samples := r.samples
-		r.samples = make([]*common.Sample, 0)
+		samples := r.queuedSamples
+		r.queuedSamples = make([]*common.Sample, 0)
 		r.cond.L.Unlock()
 
 		r.cfg.Logger.Printf("Took %v sample(s) from queue", len(samples))
@@ -120,10 +137,20 @@ func (r *reporter) processSamples() {
 			// Return any samples that weren't forwarded successfully back to the
 			// beginning of the queue.
 			r.cfg.Logger.Printf("Returning %v unreported sample(s) to queue", len(samples))
-			r.samples = append(samples, r.samples...)
+			r.queuedSamples = append(samples, r.queuedSamples...)
 		}
-		// FIXME: Rewrite the backing file if needed.
+		var newBackingFileSamples []*common.Sample
+		if !reflect.DeepEqual(r.backingFileSamples, r.queuedSamples) {
+			newBackingFileSamples = r.queuedSamples
+		}
 		r.cond.L.Unlock()
+
+		if newBackingFileSamples != nil {
+			r.cfg.Logger.Printf("Writing %v sample(s) to backing file", len(newBackingFileSamples))
+			if err := r.writeSamplesToBackingFile(newBackingFileSamples); err != nil {
+				r.cfg.Logger.Printf("Failed to write samples: %v", err)
+			}
+		}
 
 		if gotError {
 			r.cfg.Logger.Printf("Sleeping for %v ms after failure", r.cfg.ReportRetryMs)
@@ -147,5 +174,53 @@ func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
 	} else if resp.StatusCode != 200 {
 		return fmt.Errorf("Got %v", resp.Status)
 	}
+	return nil
+}
+
+func (r *reporter) readSamplesFromBackingFile() ([]*common.Sample, error) {
+	f, err := os.Open(r.cfg.BackingFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	samples := make([]*common.Sample, 0)
+	d := json.NewDecoder(f)
+	for {
+		var s common.Sample
+		if err = d.Decode(&s); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		samples = append(samples, &s)
+	}
+
+	return samples, nil
+}
+
+func (r *reporter) writeSamplesToBackingFile(samples []*common.Sample) error {
+	if r.cfg.BackingFile == "" {
+		return nil
+	}
+
+	p := r.cfg.BackingFile + tempBackingFileExtension
+	f, err := os.Create(p)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	e := json.NewEncoder(f)
+	for _, s := range samples {
+		if err = e.Encode(s); err != nil {
+			return err
+		}
+	}
+	if err = os.Rename(p, r.cfg.BackingFile); err != nil {
+		return err
+	}
+
+	r.backingFileSamples = samples
 	return nil
 }

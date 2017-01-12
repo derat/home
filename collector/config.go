@@ -12,7 +12,7 @@ type config struct {
 	ReportURL string
 
 	// Path to JSON file storing not-yet-reported samples.
-	BackingPath string
+	BackingFile string
 
 	// Maximum number of samples to report in a single request.
 	ReportBatchSize int
