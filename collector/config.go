@@ -4,10 +4,14 @@
 package collector
 
 import (
+	"erat.org/cloud"
 	"log"
 )
 
 type config struct {
+	// Address used to listen for reports, e.g. ":8080".
+	ListenAddress string
+
 	// Full URL to report samples, e.g. "http://example.com/report".
 	ReportURL string
 
@@ -31,10 +35,18 @@ type config struct {
 
 func readConfig(path string, logger *log.Logger) (*config, error) {
 	cfg := &config{}
+	cfg.ListenAddress = ":4587"
 	cfg.ReportBatchSize = 10
 	cfg.ReportTimeoutMs = 10000
 	cfg.ReportRetryMs = 10000
 	cfg.Logger = logger
-	// FIXME: Read path.
+
+	if len(path) != 0 {
+		err := cloud.ReadJson(path, cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return cfg, nil
 }
