@@ -19,6 +19,7 @@ import (
 const verbose = false
 
 const reportPath = "/report"
+const reportSecret = "this is the secret"
 const reportChannelSize = 10
 const reportTimeoutMs = 5000
 
@@ -65,7 +66,13 @@ func (ts *testServer) waitForReport(t *testing.T) string {
 func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/report":
-		ts.ch <- r.PostFormValue("d")
+		data := r.PostFormValue("d")
+		if r.PostFormValue("s") != hashStringWithSHA256(fmt.Sprintf("%s|%s", data, reportSecret)) {
+			http.Error(w, "Bad signature", 403)
+			return
+		}
+
+		ts.ch <- data
 		if ts.responseDelay > 0 {
 			time.Sleep(ts.responseDelay)
 		}
@@ -82,6 +89,7 @@ func createConfig() *config {
 	}
 
 	cfg, _ := readConfig("", log.New(out, "", log.LstdFlags))
+	cfg.ReportSecret = reportSecret
 	return cfg
 }
 

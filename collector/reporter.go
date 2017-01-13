@@ -168,7 +168,9 @@ func (r *reporter) processSamples() {
 }
 
 func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
-	resp, err := r.client.PostForm(r.cfg.ReportURL, url.Values{"d": {common.JoinSamples(samples)}})
+	data := common.JoinSamples(samples)
+	sig := hashStringWithSHA256(fmt.Sprintf("%s|%s", data, r.cfg.ReportSecret))
+	resp, err := r.client.PostForm(r.cfg.ReportURL, url.Values{"d": {data}, "s": {sig}})
 	if err != nil {
 		return err
 	} else if resp.StatusCode != 200 {

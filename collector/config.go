@@ -11,6 +11,9 @@ type config struct {
 	// Full URL to report samples, e.g. "http://example.com/report".
 	ReportURL string
 
+	// Shared secret used to sign reports.
+	ReportSecret string
+
 	// Path to JSON file storing not-yet-reported samples.
 	BackingFile string
 
