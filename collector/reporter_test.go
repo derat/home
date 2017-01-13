@@ -16,12 +16,13 @@ import (
 	"time"
 )
 
-const verbose = false
-
-const reportPath = "/report"
-const reportSecret = "this is the secret"
-const reportChannelSize = 10
-const reportTimeoutMs = 5000
+const (
+	verbose           = false
+	reportPath        = "/report"
+	reportSecret      = "this is the secret"
+	reportChannelSize = 10
+	reportTimeoutMs   = 5000
+)
 
 type testServer struct {
 	listener      net.Listener
@@ -67,8 +68,8 @@ func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/report":
 		data := r.PostFormValue("d")
-		if r.PostFormValue("s") != hashStringWithSHA256(fmt.Sprintf("%s|%s", data, reportSecret)) {
-			http.Error(w, "Bad signature", 403)
+		if r.PostFormValue("s") != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, reportSecret)) {
+			http.Error(w, "Bad signature", http.StatusBadRequest)
 			return
 		}
 
@@ -113,7 +114,7 @@ func getFileSize(p string) int64 {
 func initTest(t *testing.T, cfg *config) (*testServer, *reporter) {
 	ts := &testServer{
 		ch:           make(chan string, reportChannelSize),
-		responseCode: 200,
+		responseCode: http.StatusOK,
 	}
 	ts.start(t)
 
@@ -179,12 +180,12 @@ func TestRetry(t *testing.T) {
 	ts, r := initTest(t, createConfig())
 	defer cleanUpTest(ts, r)
 
-	ts.responseCode = 500
+	ts.responseCode = http.StatusInternalServerError
 	s0 := &common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s0)
 	ts.waitForReport(t)
 
-	ts.responseCode = 200
+	ts.responseCode = http.StatusOK
 	s1 := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s1)
 	r.triggerRetryTimeout()
@@ -221,7 +222,7 @@ func TestBackingFile(t *testing.T) {
 	ts, r := initTest(t, cfg)
 	defer ts.stop()
 
-	ts.responseCode = 500
+	ts.responseCode = http.StatusInternalServerError
 	s0 := &common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s0)
 	ts.waitForReport(t)
@@ -259,7 +260,7 @@ func TestBackingFile(t *testing.T) {
 	r.stop()
 
 	// A new reporter should report all three samples.
-	ts.responseCode = 200
+	ts.responseCode = http.StatusOK
 	r = newReporter(cfg)
 	r.start()
 	str = ts.waitForReport(t)
