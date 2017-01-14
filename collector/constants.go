@@ -1,7 +1,7 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-package collector
+package main
 
 const (
 	// Should tests be verbose?

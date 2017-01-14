@@ -1,7 +1,7 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-package collector
+package main
 
 import (
 	"flag"
@@ -18,7 +18,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [option]...\n\nOptions:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.StringVar(&configPath, "config", filepath.Join(os.Getenv("HOME"), ".collector.json"), "Path to JSON config file")
+	flag.StringVar(&configPath, "config", filepath.Join(os.Getenv("HOME"), ".home_collector.json"), "Path to JSON config file")
 	flag.Parse()
 
 	// TODO: Log to syslog instead using log/syslog:
