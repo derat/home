@@ -32,6 +32,10 @@ func main() {
 	r := newReporter(cfg)
 	r.start()
 
+	if cfg.PingHost != "" {
+		go runPingLoop(cfg, r)
+	}
+
 	l := &listener{cfg: cfg, rep: r}
 	if err = l.run(); err != nil {
 		logger.Fatalf("Got error while serving: %v", err)

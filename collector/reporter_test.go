@@ -17,11 +17,10 @@ import (
 )
 
 const (
-	verbose           = false
-	reportPath        = "/report"
-	reportSecret      = "this is the secret"
-	reportChannelSize = 10
-	reportTimeoutMs   = 5000
+	testReportPath        = "/report"
+	testReportSecret      = "this is the secret"
+	testReportChannelSize = 10
+	testReportTimeoutMs   = 5000
 )
 
 type testServer struct {
@@ -32,7 +31,7 @@ type testServer struct {
 }
 
 func (ts *testServer) getReportURL() string {
-	return "http://" + ts.listener.Addr().String() + reportPath
+	return "http://" + ts.listener.Addr().String() + testReportPath
 }
 
 func (ts *testServer) start(t *testing.T) {
@@ -51,7 +50,7 @@ func (ts *testServer) stop() {
 func (ts *testServer) waitForReport(t *testing.T) string {
 	timeout := make(chan bool, 1)
 	go func() {
-		time.Sleep(time.Duration(reportTimeoutMs) * time.Millisecond)
+		time.Sleep(time.Duration(testReportTimeoutMs) * time.Millisecond)
 		timeout <- true
 	}()
 
@@ -68,7 +67,7 @@ func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/report":
 		data := r.PostFormValue("d")
-		if r.PostFormValue("s") != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, reportSecret)) {
+		if r.PostFormValue("s") != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, testReportSecret)) {
 			http.Error(w, "Bad signature", http.StatusBadRequest)
 			return
 		}
@@ -85,12 +84,12 @@ func (ts *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func createConfig() *config {
 	out := ioutil.Discard
-	if verbose {
+	if testVerbose {
 		out = os.Stderr
 	}
 
 	cfg, _ := readConfig("", log.New(out, "", log.LstdFlags))
-	cfg.ReportSecret = reportSecret
+	cfg.ReportSecret = testReportSecret
 	return cfg
 }
 
@@ -113,7 +112,7 @@ func getFileSize(p string) int64 {
 
 func initTest(t *testing.T, cfg *config) (*testServer, *reporter) {
 	ts := &testServer{
-		ch:           make(chan string, reportChannelSize),
+		ch:           make(chan string, testReportChannelSize),
 		responseCode: http.StatusOK,
 	}
 	ts.start(t)
