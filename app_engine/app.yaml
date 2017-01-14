@@ -1,0 +1,12 @@
+application: home
+version: 1
+runtime: go
+api_version: go1
+
+builtins:
+- remote_api: on
+
+handlers:
+- url: /.*
+  script: _go_app
+  secure: always
