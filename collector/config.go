@@ -62,6 +62,7 @@ func readConfig(path string, logger *log.Logger) (*config, error) {
 	cfg.ReportBatchSize = 10
 	cfg.ReportTimeoutMs = 10000
 	cfg.ReportRetryMs = 10000
+	cfg.PingSampleIntervalSec = 60
 	cfg.PingHost = "8.8.8.8"
 	cfg.PingCount = 5
 	cfg.PingDelayMs = 1000
