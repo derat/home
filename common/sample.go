@@ -14,7 +14,7 @@ type Sample struct {
 	Timestamp time.Time
 	Source    string
 	Name      string
-	Value     float64
+	Value     float64 `datastore:",noindex"`
 }
 
 // String serializes s to a string that can later be parsed using Parse.

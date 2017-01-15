@@ -1,14 +1,15 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-package appengine
+package app
 
 import (
-	"appengine"
-	"appengine/datastore"
 	"erat.org/cloud"
 	"erat.org/home/common"
+	"erat.org/home/storage"
 	"fmt"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
 	"net/http"
 	"strings"
 	"time"
@@ -20,9 +21,6 @@ const (
 
 	// Hardcoded secret used when running dev app server.
 	devSecret = "secret"
-
-	// Datastore kind for sample entities.
-	sampleKind = "Sample"
 )
 
 type config struct {
@@ -41,14 +39,19 @@ func init() {
 		cfg.ReportSecret = devSecret
 	}
 
+	http.HandleFunc("/query", handleReport)
 	http.HandleFunc("/report", handleReport)
+}
+
+func handleQuery(w http.ResponseWriter, r *http.Request) {
+	// FIXME: run query
 }
 
 func handleReport(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
 	if r.Method != "POST" {
-		c.Warningf("Report has non-POST method %v", r.Method)
+		log.Warningf(c, "Report has non-POST method %v", r.Method)
 		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
 		return
 	}
@@ -56,7 +59,7 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	data := r.PostFormValue("d")
 	sig := r.PostFormValue("s")
 	if sig != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, cfg.ReportSecret)) {
-		c.Warningf("Report has bad signature %q", sig)
+		log.Warningf(c, "Report has bad signature %q", sig)
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
@@ -67,23 +70,16 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	for i, line := range lines {
 		s := common.Sample{}
 		if err := s.Parse(line, now); err != nil {
-			c.Warningf("Report has unparseable sample %q: %v", line, err)
+			log.Warningf(c, "Report has unparseable sample %q: %v", line, err)
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
 		samples[i] = s
 	}
 
-	c.Debugf("Got report with %v sample(s)", len(samples))
-
-	keys := make([]*datastore.Key, len(samples))
-	for i, s := range samples {
-		id := fmt.Sprintf("%d|%s|%s", s.Timestamp.Unix(), s.Source, s.Name)
-		keys[i] = datastore.NewKey(c, sampleKind, id, 0, nil)
-	}
-	if _, err := datastore.PutMulti(c, keys, samples); err != nil {
-		c.Warningf("Failed to write %v sample(s) to datastore: %v", len(samples), err)
+	log.Debugf(c, "Got report with %v sample(s)", len(samples))
+	if err := storage.WriteSamples(c, samples); err != nil {
+		log.Warningf(c, "Failed to write %v sample(s) to datastore: %v", len(samples), err)
 		http.Error(w, "Write failed", http.StatusInternalServerError)
-		return
 	}
 }
