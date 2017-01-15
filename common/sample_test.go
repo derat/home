@@ -11,7 +11,7 @@ import (
 
 const DefaultTime int64 = 12345
 
-func parseString(str string, ut int64, source, name string, value float64) error {
+func parseString(str string, ut int64, source, name string, value float32) error {
 	var s Sample
 	if err := s.Parse(str, time.Unix(DefaultTime, 0)); err != nil {
 		return err
@@ -27,7 +27,7 @@ func parseString(str string, ut int64, source, name string, value float64) error
 	return nil
 }
 
-func createString(ut int64, source, name string, value float64) string {
+func createString(ut int64, source, name string, value float32) string {
 	s := Sample{time.Unix(ut, 0), source, name, value}
 	return s.String()
 }

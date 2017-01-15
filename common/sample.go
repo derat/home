@@ -14,7 +14,7 @@ type Sample struct {
 	Timestamp time.Time
 	Source    string
 	Name      string
-	Value     float64 `datastore:",noindex"`
+	Value     float32 `datastore:",noindex"`
 }
 
 // String serializes s to a string that can later be parsed using Parse.
@@ -43,9 +43,10 @@ func (s *Sample) Parse(str string, now time.Time) error {
 
 	s.Source = parts[len(parts)-3]
 	s.Name = parts[len(parts)-2]
-	var err error
-	if s.Value, err = strconv.ParseFloat(parts[len(parts)-1], 64); err != nil {
+	if val, err := strconv.ParseFloat(parts[len(parts)-1], 64); err != nil {
 		return fmt.Errorf("Failed to parse value from %q", str)
+	} else {
+		s.Value = float32(val)
 	}
 	return nil
 }

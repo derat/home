@@ -25,18 +25,19 @@ type pingStats struct {
 	commandFailed bool
 
 	// Minimum, average, and maximum RTT, in milliseconds.
-	minReplyMs, avgReplyMs, maxReplyMs float64
+	minReplyMs, avgReplyMs, maxReplyMs float32
 
 	// Fraction of pings not receiving responses in the range [0.0, 1.0].
-	packetLoss float64
+	packetLoss float32
 }
 
-func parseFloats(s []string) ([]float64, error) {
-	f := make([]float64, len(s))
+func parseFloats(s []string) ([]float32, error) {
+	f := make([]float32, len(s))
 	for i := range s {
-		var err error
-		if f[i], err = strconv.ParseFloat(s[i], 64); err != nil {
+		if val, err := strconv.ParseFloat(s[i], 64); err != nil {
 			return nil, err
+		} else {
+			f[i] = float32(val)
 		}
 	}
 	return f, nil
@@ -51,7 +52,7 @@ func getPingStats(cfg *config) *pingStats {
 
 	s := &pingStats{}
 
-	var tx, rx float64
+	var tx, rx float32
 	if cm := countRegexp.FindStringSubmatch(string(out)); cm == nil {
 		cfg.Logger.Printf("Didn't find ping count in %q", string(out))
 		s.commandFailed = true
@@ -94,7 +95,7 @@ func runPingLoop(cfg *config, r *reporter) {
 		start := time.Now()
 		stats := getPingStats(cfg)
 
-		failedVal := 0.0
+		failedVal := float32(0.0)
 		if stats.commandFailed {
 			failedVal = 1.0
 		}

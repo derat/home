@@ -19,7 +19,7 @@ const (
 
 type point struct {
 	timestamp time.Time
-	value     float64
+	value     float32
 	err       error
 }
 
@@ -28,12 +28,12 @@ type point struct {
 // is NaN.
 type timeData struct {
 	timestamp time.Time
-	values    []float64
+	values    []float32
 	err       error
 }
 
 func mergeQueryData(in []chan point, out chan timeData) {
-	nan := math.NaN()
+	nan := float32(math.NaN())
 	next := make([]*point, len(in))
 	for {
 		t := time.Time{}
@@ -60,7 +60,7 @@ func mergeQueryData(in []chan point, out chan timeData) {
 			break
 		}
 
-		data := timeData{t, make([]float64, len(in)), nil}
+		data := timeData{t, make([]float32, len(in)), nil}
 		for i := range next {
 			if next[i] != nil && next[i].timestamp == t {
 				data.values[i] = next[i].value

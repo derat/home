@@ -9,19 +9,20 @@ import (
 	"time"
 )
 
-func makePoint(t int, value float64) point {
+func makePoint(t int, value float32) point {
 	return point{time.Unix(int64(t), 0), value, nil}
 }
 
-func floatSlicesEqual(a, b []float64) bool {
+func floatSlicesEqual(a, b []float32) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i := range a {
-		if math.IsNaN(a[i]) != math.IsNaN(b[i]) {
+		a_nan, b_nan := (a[i] != a[i]), (b[i] != b[i])
+		if a_nan != b_nan {
 			return false
 		}
-		if !math.IsNaN(a[i]) && a[i] != b[i] {
+		if !a_nan && a[i] != b[i] {
 			return false
 		}
 	}
@@ -51,17 +52,17 @@ func TestMergeQueryData(t *testing.T) {
 	out := make(chan timeData)
 	go mergeQueryData(chans, out)
 
-	nan := math.NaN()
+	nan := float32(math.NaN())
 	for i, exp := range []timeData{
-		{time.Unix(1, 0), []float64{0.1, 1.1, nan, nan, nan, nan}, nil},
-		{time.Unix(2, 0), []float64{0.2, nan, 2.2, nan, nan, nan}, nil},
-		{time.Unix(3, 0), []float64{nan, 1.3, nan, nan, 4.3, nan}, nil},
-		{time.Unix(4, 0), []float64{nan, nan, 2.4, nan, nan, nan}, nil},
-		{time.Unix(5, 0), []float64{0.5, nan, nan, 3.5, nan, nan}, nil},
-		{time.Unix(6, 0), []float64{nan, 1.6, nan, nan, 4.6, nan}, nil},
-		{time.Unix(7, 0), []float64{nan, nan, 2.7, nan, nan, nan}, nil},
-		{time.Unix(8, 0), []float64{nan, nan, nan, nan, 4.8, nan}, nil},
-		{time.Unix(9, 0), []float64{nan, nan, nan, nan, 4.9, nan}, nil},
+		{time.Unix(1, 0), []float32{0.1, 1.1, nan, nan, nan, nan}, nil},
+		{time.Unix(2, 0), []float32{0.2, nan, 2.2, nan, nan, nan}, nil},
+		{time.Unix(3, 0), []float32{nan, 1.3, nan, nan, 4.3, nan}, nil},
+		{time.Unix(4, 0), []float32{nan, nan, 2.4, nan, nan, nan}, nil},
+		{time.Unix(5, 0), []float32{0.5, nan, nan, 3.5, nan, nan}, nil},
+		{time.Unix(6, 0), []float32{nan, 1.6, nan, nan, 4.6, nan}, nil},
+		{time.Unix(7, 0), []float32{nan, nan, 2.7, nan, nan, nan}, nil},
+		{time.Unix(8, 0), []float32{nan, nan, nan, nan, 4.8, nan}, nil},
+		{time.Unix(9, 0), []float32{nan, nan, nan, nan, 4.9, nan}, nil},
 	} {
 		act, more := <-out
 		if !more {
