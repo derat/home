@@ -5,8 +5,8 @@ package app
 
 import (
 	"erat.org/cloud"
+	"erat.org/home/app_engine/storage"
 	"erat.org/home/common"
-	"erat.org/home/storage"
 	"fmt"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
