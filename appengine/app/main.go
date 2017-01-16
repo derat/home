@@ -31,20 +31,23 @@ const (
 )
 
 type graphLineConfig struct {
+	Label  string
 	Source string
 	Name   string
 }
 
 type graphConfig struct {
-	Title string
-	Units string
-	Lines []graphLineConfig
+	Title   string
+	Units   string
+	MinZero bool
+	Lines   []graphLineConfig
 }
 
 type templateGraph struct {
 	Id        string
 	Title     string
 	Units     string
+	MinZero   bool
 	QueryPath string
 }
 
@@ -91,6 +94,7 @@ func init() {
 func handleQuery(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
+	labels := strings.Split(r.FormValue("labels"), ",")
 	sourceNames := strings.Split(r.FormValue("names"), ",")
 
 	parseTime := func(s string) (time.Time, error) {
@@ -111,7 +115,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buf, err := storage.RunQuery(c, sourceNames, start, end, location)
+	buf, err := storage.RunQuery(c, labels, sourceNames, start, end, location)
 	if err != nil {
 		log.Errorf(c, "Query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
@@ -167,14 +171,17 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	for i, g := range cfg.Graphs {
 		id := fmt.Sprintf("graph%d", i)
-		ls := make([]string, len(g.Lines))
+		sns := make([]string, len(g.Lines))
+		labels := make([]string, len(g.Lines))
 		for j, l := range g.Lines {
-			ls[j] = fmt.Sprintf("%s|%s", l.Source, l.Name)
+			sns[j] = fmt.Sprintf("%s|%s", l.Source, l.Name)
+			labels[j] = l.Label
 		}
 		start := time.Now().Add(-graphSec * time.Second).Unix()
 		end := time.Now().Unix()
-		queryPath := fmt.Sprintf("/query?names=%s&start=%d&end=%d", strings.Join(ls, ","), start, end)
-		d.Graphs[i] = templateGraph{id, g.Title, g.Units, queryPath}
+		queryPath := fmt.Sprintf("/query?labels=%s&names=%s&start=%d&end=%d",
+			strings.Join(labels, ","), strings.Join(sns, ","), start, end)
+		d.Graphs[i] = templateGraph{id, g.Title, g.Units, g.MinZero, queryPath}
 	}
 
 	if err := tmpl.Execute(w, d); err != nil {

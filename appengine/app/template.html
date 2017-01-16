@@ -10,7 +10,7 @@
 
       function drawCharts() {
         {{range .Graphs}}
-        loadData({{.QueryPath}}, handleData.bind(null, {{.Id}}, {{.Units}}));
+        loadData({{.QueryPath}}, handleData.bind(null, {{.Id}}, {{.Title}}, {{.Units}}, {{.MinZero}}));
         {{end}}
       }
 
@@ -31,11 +31,17 @@
         xhr.send(null);
       }
 
-      function handleData(id, units, data) {
+      function handleData(id, title, units, minZero, data) {
         var table = new google.visualization.DataTable(data);
         var options = {
+          title: title,
           hAxis: { title: 'Time' },
-          vAxis: { title: units },
+          vAxis: {
+            title: units,
+            viewWindow: {
+              min: minZero ? 0.0 : null
+            }
+          },
           pointSize: 2,
           interpolateNulls: true
         };
@@ -44,11 +50,16 @@
       }
 
     </script>
+    <style>
+      div.graph {
+        width: 800px;
+        height: 400px;
+      }
+    </style>
   </head>
 <body>
   {{range .Graphs}}
-  <h3>{{.Title}}</h3>
-  <div id="{{.Id}}"></div>
+  <div id="{{.Id}}" class="graph"></div>
   {{end}}
 </body>
 </html>

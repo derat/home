@@ -76,13 +76,13 @@ func mergeQueryData(in []chan point, out chan timeData) {
 	close(out)
 }
 
-func generateQueryOutput(sourceNames []string, ch chan timeData, loc *time.Location) (*bytes.Buffer, error) {
+func generateQueryOutput(labels []string, ch chan timeData, loc *time.Location) (*bytes.Buffer, error) {
 	buf := &bytes.Buffer{}
 	buf.WriteString("{\"cols\":[")
 	buf.WriteString("{\"label\":\"Time\",\"type\":\"datetime\"}")
-	for _, sn := range sourceNames {
+	for _, l := range labels {
 		buf.WriteString(",{\"label\":\"")
-		buf.WriteString(sn)
+		buf.WriteString(l)
 		buf.WriteString("\",\"type\":\"number\"}")
 	}
 	buf.WriteString("],\"rows\":[")
@@ -129,7 +129,7 @@ func generateQueryOutput(sourceNames []string, ch chan timeData, loc *time.Locat
 	return buf, nil
 }
 
-func RunQuery(c context.Context, sourceNames []string,
+func RunQuery(c context.Context, labels, sourceNames []string,
 	start, end time.Time, loc *time.Location) (*bytes.Buffer, error) {
 	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
 	baseQuery = baseQuery.Filter("Timestamp >=", start).Filter("Timestamp <=", end)
@@ -161,5 +161,5 @@ func RunQuery(c context.Context, sourceNames []string,
 
 	out := make(chan timeData)
 	go mergeQueryData(chans, out)
-	return generateQueryOutput(sourceNames, out, loc)
+	return generateQueryOutput(labels, out, loc)
 }
