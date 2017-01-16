@@ -133,17 +133,18 @@ func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
 				return true
 			}
 		}
-		log.Warningf(c, "Got request from unauthorized user %q", u.Email)
+		log.Warningf(c, "Got request from invalid user %q", u.Email)
+		http.Error(w, "Forbidden", http.StatusForbidden)
 	} else {
 		log.Warningf(c, "Got unauthorized request")
+		if redirect {
+			loginURL, _ := user.LoginURL(c, r.URL.String())
+			http.Redirect(w, r, loginURL, http.StatusFound)
+		} else {
+			http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+		}
 	}
 
-	if redirect {
-		loginURL, _ := user.LoginURL(c, r.URL.String())
-		http.Redirect(w, r, loginURL, http.StatusFound)
-	} else {
-		http.Error(w, "Request requires authorization", http.StatusUnauthorized)
-	}
 	return false
 }
 
