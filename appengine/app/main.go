@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/user"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -68,6 +69,9 @@ type config struct {
 	// Secret used by collector to sign reports.
 	ReportSecret string
 
+	// Email addresses of authorized users.
+	Users []string
+
 	// Time zone, e.g. "America/Los_Angeles".
 	TimeZone string
 
@@ -101,6 +105,9 @@ func init() {
 	if appengine.IsDevAppServer() {
 		cfg.ReportSecret = devSecret
 	}
+	if cfg.TimeZone == "" {
+		cfg.TimeZone = "America/Los_Angeles"
+	}
 	if location, err = time.LoadLocation(cfg.TimeZone); err != nil {
 		panic(err)
 	}
@@ -118,9 +125,35 @@ func init() {
 	http.HandleFunc("/", handleIndex)
 }
 
-func handleQuery(w http.ResponseWriter, r *http.Request) {
+func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
 	c := appengine.NewContext(r)
+	u := user.Current(c)
+	if u != nil {
+		for _, e := range cfg.Users {
+			if u.Email == e {
+				return true
+			}
+		}
+		log.Warningf(c, "Got request from unauthorized user %q", u.Email)
+	} else {
+		log.Warningf(c, "Got unauthorized request")
+	}
 
+	if redirect {
+		loginURL, _ := user.LoginURL(c, r.URL.String())
+		http.Redirect(w, r, loginURL, http.StatusFound)
+	} else {
+		http.Error(w, "Request requires authorization", http.StatusUnauthorized)
+	}
+	return false
+}
+
+func handleQuery(w http.ResponseWriter, r *http.Request) {
+	if !checkAuth(w, r, false) {
+		return
+	}
+
+	c := appengine.NewContext(r)
 	labels := strings.Split(r.FormValue("labels"), ",")
 	sourceNames := strings.Split(r.FormValue("names"), ",")
 
@@ -189,8 +222,11 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
+	if !checkAuth(w, r, true) {
+		return
+	}
 
+	c := appengine.NewContext(r)
 	d := struct {
 		Title  string
 		Graphs []templateGraph
