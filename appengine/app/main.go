@@ -22,29 +22,50 @@ const (
 	// Config path relative to base app directory.
 	configPath = "config.json"
 
+	// Path of template file relative to base app directory.
+	templatePath = "template.html"
+
 	// Hardcoded secret used when running dev app server.
 	devSecret = "secret"
 
-	templatePath = "template.html"
-
-	graphSec = 3600
+	// Duration of samples to display in graphs.
+	defaultGraphSec = 7200
 )
 
+// graphLineConfig describes a line within a graph.
 type graphLineConfig struct {
-	Label  string
+	// Label displayed on graph.
+	Label string
+
+	// Source and name associated with samples.
 	Source string
 	Name   string
 }
 
+// graphConfig holds configuration for an individual graph.
 type graphConfig struct {
-	Title   string
-	Units   string
+	// Graph title.
+	Title string
+
+	// Human-units used as label for vertical axis.
+	Units string
+
+	// Number of seconds of data to graph.
+	Seconds int
+
+	// If true, vertical axis doesn't go below zero.
 	MinZero bool
-	Short   bool
-	Lines   []graphLineConfig
+
+	// If true, graph is shorter than usual.
+	Short bool
+
+	// Lines within the graph.
+	Lines []graphLineConfig
 }
+
+// config holds user-configurable top-level settings.
 type config struct {
-	// Secret used to sign reports.
+	// Secret used by collector to sign reports.
 	ReportSecret string
 
 	// Time zone, e.g. "America/Los_Angeles".
@@ -53,9 +74,11 @@ type config struct {
 	// Page title.
 	Title string
 
+	// Graphs to display on page.
 	Graphs []graphConfig
 }
 
+// templateGraph is used to pass graph information to the template.
 type templateGraph struct {
 	Id        string
 	Title     string
@@ -176,19 +199,25 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		Graphs: make([]templateGraph, len(cfg.Graphs)),
 	}
 	for i, g := range cfg.Graphs {
-		id := fmt.Sprintf("graph%d", i)
 		sns := make([]string, len(g.Lines))
 		labels := make([]string, len(g.Lines))
 		for j, l := range g.Lines {
 			sns[j] = fmt.Sprintf("%s|%s", l.Source, l.Name)
 			labels[j] = l.Label
 		}
-		start := time.Now().Add(-graphSec * time.Second).Unix()
+
+		sec := defaultGraphSec
+		if g.Seconds > 0 {
+			sec = g.Seconds
+		}
+		start := time.Now().Add(time.Duration(-sec) * time.Second).Unix()
 		end := time.Now().Unix()
+
 		queryPath := fmt.Sprintf("/query?labels=%s&names=%s&start=%d&end=%d",
 			strings.Join(labels, ","), strings.Join(sns, ","), start, end)
+
 		d.Graphs[i] = templateGraph{
-			Id:        id,
+			Id:        fmt.Sprintf("graph%d", i),
 			Title:     g.Title,
 			Units:     g.Units,
 			MinZero:   g.MinZero,
