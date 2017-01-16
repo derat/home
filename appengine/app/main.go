@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
+	"html/template"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,7 +24,29 @@ const (
 
 	// Hardcoded secret used when running dev app server.
 	devSecret = "secret"
+
+	templatePath = "template.html"
+
+	graphSec = 3600
 )
+
+type graphLineConfig struct {
+	Source string
+	Name   string
+}
+
+type graphConfig struct {
+	Title string
+	Units string
+	Lines []graphLineConfig
+}
+
+type templateGraph struct {
+	Id        string
+	Title     string
+	Units     string
+	QueryPath string
+}
 
 type config struct {
 	// Secret used to sign reports.
@@ -30,10 +54,13 @@ type config struct {
 
 	// Time zone, e.g. "America/Los_Angeles".
 	TimeZone string
+
+	Graphs []graphConfig
 }
 
 var cfg *config
 var location *time.Location
+var tmpl *template.Template
 
 func init() {
 	var err error
@@ -48,8 +75,17 @@ func init() {
 		panic(err)
 	}
 
+	data, err := ioutil.ReadFile(templatePath)
+	if err != nil {
+		panic(err)
+	}
+	if tmpl, err = template.New(templatePath).Parse(string(data)); err != nil {
+		panic(err)
+	}
+
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/report", handleReport)
+	http.HandleFunc("/", handleIndex)
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +113,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	buf, err := storage.RunQuery(c, sourceNames, start, end, location)
 	if err != nil {
-		log.Warningf(c, "Query failed: %v", err)
+		log.Errorf(c, "Query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
 		return
 	}
@@ -116,7 +152,33 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 
 	log.Debugf(c, "Got report with %v sample(s)", len(samples))
 	if err := storage.WriteSamples(c, samples); err != nil {
-		log.Warningf(c, "Failed to write %v sample(s) to datastore: %v", len(samples), err)
+		log.Errorf(c, "Failed to write %v sample(s) to datastore: %v", len(samples), err)
 		http.Error(w, "Write failed", http.StatusInternalServerError)
+	}
+}
+
+func handleIndex(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
+	d := struct {
+		Graphs []templateGraph
+	}{
+		Graphs: make([]templateGraph, len(cfg.Graphs)),
+	}
+	for i, g := range cfg.Graphs {
+		id := fmt.Sprintf("graph%d", i)
+		ls := make([]string, len(g.Lines))
+		for j, l := range g.Lines {
+			ls[j] = fmt.Sprintf("%s|%s", l.Source, l.Name)
+		}
+		start := time.Now().Add(-graphSec * time.Second).Unix()
+		end := time.Now().Unix()
+		queryPath := fmt.Sprintf("/query?names=%s&start=%d&end=%d", strings.Join(ls, ","), start, end)
+		d.Graphs[i] = templateGraph{id, g.Title, g.Units, queryPath}
+	}
+
+	if err := tmpl.Execute(w, d); err != nil {
+		log.Errorf(c, "Executing template failed: %v", err)
+		http.Error(w, "Template failed", http.StatusInternalServerError)
 	}
 }

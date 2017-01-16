@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script>
+      google.charts.load('current', {packages: ['corechart', 'line']});
+      google.charts.setOnLoadCallback(drawCharts);
+
+      function drawCharts() {
+        {{range .Graphs}}
+        loadData({{.QueryPath}}, handleData.bind(null, {{.Id}}, {{.Units}}));
+        {{end}}
+      }
+
+      function loadData(path, cb) {
+        console.log("Requesting " + path);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', path, true);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState == 4) {
+            if (xhr.status == 200) {
+              console.log("Got " + path);
+              cb(xhr.responseText);
+            } else {
+              console.log("Got error when loading " + path + ": " + xhr.responseText);
+            }
+          }
+        }
+        xhr.send(null);
+      }
+
+      function handleData(id, units, data) {
+        var table = new google.visualization.DataTable(data);
+        var options = {
+          hAxis: { title: 'Time' },
+          vAxis: { title: units },
+          pointSize: 2,
+          interpolateNulls: true
+        };
+        var chart = new google.visualization.LineChart(document.getElementById(id));
+        chart.draw(table, options);
+      }
+
+    </script>
+  </head>
+<body>
+  {{range .Graphs}}
+  <h3>{{.Title}}</h3>
+  <div id="{{.Id}}"></div>
+  {{end}}
+</body>
+</html>
