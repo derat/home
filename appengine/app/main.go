@@ -43,6 +43,18 @@ type graphConfig struct {
 	Short   bool
 	Lines   []graphLineConfig
 }
+type config struct {
+	// Secret used to sign reports.
+	ReportSecret string
+
+	// Time zone, e.g. "America/Los_Angeles".
+	TimeZone string
+
+	// Page title.
+	Title string
+
+	Graphs []graphConfig
+}
 
 type templateGraph struct {
 	Id        string
@@ -51,16 +63,6 @@ type templateGraph struct {
 	MinZero   bool
 	Short     bool
 	QueryPath string
-}
-
-type config struct {
-	// Secret used to sign reports.
-	ReportSecret string
-
-	// Time zone, e.g. "America/Los_Angeles".
-	TimeZone string
-
-	Graphs []graphConfig
 }
 
 var cfg *config
@@ -167,8 +169,10 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
 	d := struct {
+		Title  string
 		Graphs []templateGraph
 	}{
+		Title:  cfg.Title,
 		Graphs: make([]templateGraph, len(cfg.Graphs)),
 	}
 	for i, g := range cfg.Graphs {

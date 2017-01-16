@@ -3,6 +3,7 @@
   <head>
     <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>{{.Title}}</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script>
       google.charts.load('current', {packages: ['line']});
@@ -55,8 +56,11 @@
       .graph {
         width: 600px;
         max-width: calc(100% - 20px);
-        height: 400px;
-        margin: 10px 10px 20px 10px;
+        height: 300px;
+        margin: 40px 10px 10px 10px;
+      }
+      .graph:first-of-type {
+        margin-top: 10px;
       }
       .short {
         height: 200px;
