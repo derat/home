@@ -4,7 +4,6 @@
 package app
 
 import (
-	"erat.org/cloud"
 	"erat.org/home/appengine/storage"
 	"erat.org/home/common"
 	"fmt"
@@ -99,7 +98,7 @@ var tmpl *template.Template
 func init() {
 	var err error
 	cfg = &config{}
-	if err = cloud.ReadJson(configPath, cfg); err != nil {
+	if err = common.ReadJson(configPath, cfg); err != nil {
 		panic(err)
 	}
 	if appengine.IsDevAppServer() {

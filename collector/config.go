@@ -4,7 +4,7 @@
 package main
 
 import (
-	"erat.org/cloud"
+	"erat.org/home/common"
 	"log"
 )
 
@@ -70,7 +70,7 @@ func readConfig(path string, logger *log.Logger) (*config, error) {
 	cfg.Logger = logger
 
 	if len(path) != 0 {
-		err := cloud.ReadJson(path, cfg)
+		err := common.ReadJson(path, cfg)
 		if err != nil {
 			return nil, err
 		}
