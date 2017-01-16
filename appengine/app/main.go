@@ -11,6 +11,7 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -26,25 +27,61 @@ const (
 type config struct {
 	// Secret used to sign reports.
 	ReportSecret string
+
+	// Time zone, e.g. "America/Los_Angeles".
+	TimeZone string
 }
 
 var cfg *config
+var location *time.Location
 
 func init() {
+	var err error
 	cfg = &config{}
-	if err := cloud.ReadJson(configPath, cfg); err != nil {
+	if err = cloud.ReadJson(configPath, cfg); err != nil {
 		panic(err)
 	}
 	if appengine.IsDevAppServer() {
 		cfg.ReportSecret = devSecret
 	}
+	if location, err = time.LoadLocation(cfg.TimeZone); err != nil {
+		panic(err)
+	}
 
-	http.HandleFunc("/query", handleReport)
+	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/report", handleReport)
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
-	// FIXME: run query
+	c := appengine.NewContext(r)
+
+	sourceNames := strings.Split(r.FormValue("names"), ",")
+
+	parseTime := func(s string) (time.Time, error) {
+		t, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			log.Warningf(c, "Query has bad time %q", s)
+			http.Error(w, "Bad time", http.StatusBadRequest)
+			return time.Time{}, err
+		}
+		return time.Unix(t, 0), nil
+	}
+	var start, end time.Time
+	var err error
+	if start, err = parseTime(r.FormValue("start")); err != nil {
+		return
+	}
+	if end, err = parseTime(r.FormValue("end")); err != nil {
+		return
+	}
+
+	buf, err := storage.RunQuery(c, sourceNames, start, end, location)
+	if err != nil {
+		log.Warningf(c, "Query failed: %v", err)
+		http.Error(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+	w.Write(buf.Bytes())
 }
 
 func handleReport(w http.ResponseWriter, r *http.Request) {

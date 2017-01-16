@@ -4,11 +4,13 @@
 package storage
 
 import (
+	"bytes"
 	"erat.org/home/common"
 	"fmt"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -74,7 +76,61 @@ func mergeQueryData(in []chan point, out chan timeData) {
 	close(out)
 }
 
-func RunQuery(c context.Context, sourceNames []string, start, end time.Time) error {
+func generateQueryOutput(sourceNames []string, ch chan timeData, loc *time.Location) (*bytes.Buffer, error) {
+	buf := &bytes.Buffer{}
+	buf.WriteString("{\"cols\":[")
+	buf.WriteString("{\"label\":\"Time\",\"type\":\"datetime\"}")
+	for _, sn := range sourceNames {
+		buf.WriteString(",{\"label\":\"")
+		buf.WriteString(sn)
+		buf.WriteString("\",\"type\":\"number\"}")
+	}
+	buf.WriteString("],\"rows\":[")
+	rowNum := 0
+	for d := range ch {
+		if d.err != nil {
+			return nil, d.err
+		}
+
+		if rowNum > 0 {
+			buf.WriteString(",")
+		}
+
+		// Well, this is awesome.
+		t := d.timestamp.In(loc)
+		buf.WriteString("{\"c\":[{\"v\":\"Date(")
+		buf.WriteString(fmt.Sprintf("%d,%d,%d,%d,%d,%d",
+			t.Year(), int(t.Month())-1, t.Day(), t.Hour(), t.Minute(), t.Second()))
+		buf.WriteString(")\"}")
+
+		// Find the index of the last non-NaN value.
+		lastCol := -1
+		for i, v := range d.values {
+			if v == v {
+				lastCol = i
+			}
+		}
+		for i := 0; i <= lastCol; i++ {
+			var val string
+			if d.values[i] != d.values[i] {
+				val = "null"
+			} else {
+				val = strconv.FormatFloat(float64(d.values[i]), 'f', -1, 32)
+			}
+			buf.WriteString(",{\"v\":")
+			buf.WriteString(val)
+			buf.WriteString("}")
+		}
+
+		buf.WriteString("]}")
+		rowNum++
+	}
+	buf.WriteString("]}")
+	return buf, nil
+}
+
+func RunQuery(c context.Context, sourceNames []string,
+	start, end time.Time, loc *time.Location) (*bytes.Buffer, error) {
 	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
 	baseQuery = baseQuery.Filter("Timestamp >=", start).Filter("Timestamp <=", end)
 
@@ -83,7 +139,7 @@ func RunQuery(c context.Context, sourceNames []string, start, end time.Time) err
 		chans[i] = make(chan point)
 		parts := strings.Split(sn, "|")
 		if len(parts) != 2 {
-			return fmt.Errorf("Invalid 'source|name' string %q", sn)
+			return nil, fmt.Errorf("Invalid 'source|name' string %q", sn)
 		}
 		q := baseQuery.Filter("Source =", parts[0]).Filter("Name =", parts[1])
 
@@ -103,8 +159,7 @@ func RunQuery(c context.Context, sourceNames []string, start, end time.Time) err
 		}(q, chans[i])
 	}
 
-	// FIXME: read from out
 	out := make(chan timeData)
-	mergeQueryData(chans, out)
-	return nil
+	go mergeQueryData(chans, out)
+	return generateQueryOutput(sourceNames, out, loc)
 }
