@@ -79,7 +79,7 @@ func mergeQueryData(in []chan point, out chan timeData) {
 func generateQueryOutput(labels []string, ch chan timeData, loc *time.Location) (*bytes.Buffer, error) {
 	buf := &bytes.Buffer{}
 	buf.WriteString("{\"cols\":[")
-	buf.WriteString("{\"label\":\"Time\",\"type\":\"datetime\"}")
+	buf.WriteString("{\"type\":\"datetime\"}")
 	for _, l := range labels {
 		buf.WriteString(",{\"label\":\"")
 		buf.WriteString(l)
