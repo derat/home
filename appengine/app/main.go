@@ -40,6 +40,7 @@ type graphConfig struct {
 	Title   string
 	Units   string
 	MinZero bool
+	Short   bool
 	Lines   []graphLineConfig
 }
 
@@ -48,6 +49,7 @@ type templateGraph struct {
 	Title     string
 	Units     string
 	MinZero   bool
+	Short     bool
 	QueryPath string
 }
 
@@ -181,7 +183,14 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		end := time.Now().Unix()
 		queryPath := fmt.Sprintf("/query?labels=%s&names=%s&start=%d&end=%d",
 			strings.Join(labels, ","), strings.Join(sns, ","), start, end)
-		d.Graphs[i] = templateGraph{id, g.Title, g.Units, g.MinZero, queryPath}
+		d.Graphs[i] = templateGraph{
+			Id:        id,
+			Title:     g.Title,
+			Units:     g.Units,
+			MinZero:   g.MinZero,
+			Short:     g.Short,
+			QueryPath: queryPath,
+		}
 	}
 
 	if err := tmpl.Execute(w, d); err != nil {

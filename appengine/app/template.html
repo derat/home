@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script>
-      google.charts.load('current', {packages: ['corechart', 'line']});
+      google.charts.load('current', {packages: ['line']});
       google.charts.setOnLoadCallback(drawCharts);
 
       function drawCharts() {
@@ -34,7 +34,9 @@
       function handleData(id, title, units, minZero, data) {
         var table = new google.visualization.DataTable(data);
         var options = {
-          title: title,
+          chart: {
+            title: title,
+          },
           hAxis: { title: 'Time' },
           vAxis: {
             title: units,
@@ -42,24 +44,28 @@
               min: minZero ? 0.0 : null
             }
           },
-          pointSize: 2,
           interpolateNulls: true
         };
-        var chart = new google.visualization.LineChart(document.getElementById(id));
-        chart.draw(table, options);
+        var chart = new google.charts.Line(document.getElementById(id));
+        chart.draw(table, google.charts.Line.convertOptions(options));
       }
 
     </script>
     <style>
-      div.graph {
-        width: 800px;
+      .graph {
+        width: 600px;
+        max-width: calc(100% - 20px);
         height: 400px;
+        margin: 10px 10px 20px 10px;
+      }
+      .short {
+        height: 200px;
       }
     </style>
   </head>
 <body>
   {{range .Graphs}}
-  <div id="{{.Id}}" class="graph"></div>
+  <div id="{{.Id}}" class="graph{{if .Short}} short{{end}}"></div>
   {{end}}
 </body>
 </html>
