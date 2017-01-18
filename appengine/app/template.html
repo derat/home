@@ -9,13 +9,43 @@
       google.charts.load('current', {packages: ['line']});
       google.charts.setOnLoadCallback(drawCharts);
 
+      var configs = {};
+
+      function getTime() {
+        return Math.floor((new Date).getTime() / 1000);
+      }
+
+      function parseResponse(response) {
+        var table = new google.visualization.DataTable(response);
+        if (!table.getNumberOfRows()) {
+          // The Google Chart API blows up in interesting ways if passed a
+          // DataTable without any rows. Add a fake one.
+          console.log("Inserting empty row");
+          table.addRow();
+        }
+        return table;
+      }
+
       function drawCharts() {
+        var now = getTime();
+
         {{range .Graphs}}
-        loadData({{.QueryPath}}, handleData.bind(null, {{.Id}}, {{.Title}}, {{.Units}}, {{.MinZero}}));
+        configs[{{.Id}}] = {
+          path: {{.QueryPath}},
+          startTime: now - {{.Seconds}},
+          endTime: now
+        };
+        loadData(configs[{{.Id}}],
+            createChart.bind(null, {{.Id}}, {{.Title}}, {{.Units}}, {{.MinZero}}));
+        document.getElementById('earlier-{{.Id}}').addEventListener(
+            'click', updateChartTime.bind(null, {{.Id}}, -{{.Seconds}}));
+        document.getElementById('later-{{.Id}}').addEventListener(
+            'click', updateChartTime.bind(null, {{.Id}}, {{.Seconds}}));
         {{end}}
       }
 
-      function loadData(path, cb) {
+      function loadData(config, cb) {
+        var path = config.path + "&start=" + config.startTime + "&end=" + config.endTime;
         console.log("Requesting " + path);
         var xhr = new XMLHttpRequest();
         xhr.open('GET', path, true);
@@ -32,9 +62,9 @@
         xhr.send(null);
       }
 
-      function handleData(id, title, units, minZero, data) {
-        var table = new google.visualization.DataTable(data);
-        var options = {
+      function createChart(id, title, units, minZero, data) {
+        var config = configs[id];
+        config.options = google.charts.Line.convertOptions({
           chart: {
             title: title,
           },
@@ -45,30 +75,67 @@
             }
           },
           interpolateNulls: true
-        };
-        var chart = new google.charts.Line(document.getElementById(id));
-        chart.draw(table, google.charts.Line.convertOptions(options));
+        });
+        config.chart = new google.charts.Line(document.getElementById(id));
+        config.chart.draw(parseResponse(data), config.options);
       }
 
+      function updateChartTime(id, offsetSec) {
+        var config = configs[id];
+        var duration = config.endTime - config.startTime;
+        config.endTime = Math.min(config.endTime + offsetSec, getTime());
+        config.startTime = config.endTime - duration;
+
+        loadData(config, function(data) {
+          config.chart.draw(parseResponse(data), config.options);
+        });
+      }
     </script>
     <style>
-      .graph {
-        width: 600px;
-        max-width: calc(100% - 20px);
+      body {
+        font-family: 'Roboto', sans-serif;
+      }
+      .chart {
         height: 300px;
         margin: 30px 10px 10px 10px;
+        max-width: calc(100% - 20px);
+        width: 600px;
       }
-      .graph:first-of-type {
+      .chart:first-of-type {
         margin-top: 10px;
       }
       .short {
         height: 200px;
       }
+      .controls {
+        color: #424242;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        max-width: calc(100% - 20px);
+        width: 600px;
+      }
+      .controls span {
+        cursor: pointer;
+      }
+      .controls span:hover {
+        text-decoration: underline;
+      }
+      .earlier {
+        margin-left: 65px;
+      }
+      .later {
+        margin-right: 85px;
+      }
     </style>
   </head>
 <body>
   {{range .Graphs}}
-  <div id="{{.Id}}" class="graph{{if .Short}} short{{end}}"></div>
+  <div id="{{.Id}}" class="chart{{if .Short}} short{{end}}"></div>
+  <div class="controls">
+    <span id="earlier-{{.Id}}" class="earlier">Earlier</span>
+    <span id="later-{{.Id}}" class="later">Later</span>
+  </div>
   {{end}}
 </body>
 </html>

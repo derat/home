@@ -89,17 +89,18 @@ type templateGraph struct {
 	MinZero   bool
 	Short     bool
 	QueryPath string
+	Seconds   int
 }
 
 var cfg *config
 var location *time.Location
 var tmpl *template.Template
 
-func init() {
+func loadConfig() error {
 	var err error
 	cfg = &config{}
 	if err = common.ReadJson(configPath, cfg); err != nil {
-		panic(err)
+		return err
 	}
 	if appengine.IsDevAppServer() {
 		cfg.ReportSecret = devSecret
@@ -107,7 +108,20 @@ func init() {
 	if cfg.TimeZone == "" {
 		cfg.TimeZone = "America/Los_Angeles"
 	}
+	for i := range cfg.Graphs {
+		if cfg.Graphs[i].Seconds <= 0 {
+			cfg.Graphs[i].Seconds = defaultGraphSec
+		}
+	}
 	if location, err = time.LoadLocation(cfg.TimeZone); err != nil {
+		return err
+	}
+	return nil
+}
+
+func init() {
+	var err error
+	if err = loadConfig(); err != nil {
 		panic(err)
 	}
 
@@ -241,16 +255,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			sns[j] = fmt.Sprintf("%s|%s", l.Source, l.Name)
 			labels[j] = l.Label
 		}
-
-		sec := defaultGraphSec
-		if g.Seconds > 0 {
-			sec = g.Seconds
-		}
-		start := time.Now().Add(time.Duration(-sec) * time.Second).Unix()
-		end := time.Now().Unix()
-
-		queryPath := fmt.Sprintf("/query?labels=%s&names=%s&start=%d&end=%d",
-			strings.Join(labels, ","), strings.Join(sns, ","), start, end)
+		queryPath := fmt.Sprintf("/query?labels=%s&names=%s",
+			strings.Join(labels, ","), strings.Join(sns, ","))
 
 		d.Graphs[i] = templateGraph{
 			Id:        fmt.Sprintf("graph%d", i),
@@ -259,6 +265,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			MinZero:   g.MinZero,
 			Short:     g.Short,
 			QueryPath: queryPath,
+			Seconds:   g.Seconds,
 		}
 	}
 
