@@ -58,7 +58,7 @@ type config struct {
 func readConfig(path string, logger *log.Logger) (*config, error) {
 	cfg := &config{}
 	cfg.Source = "collector"
-	cfg.ListenAddress = ":4587"
+	cfg.ListenAddress = ":8123"
 	cfg.ReportBatchSize = 10
 	cfg.ReportTimeoutMs = 10000
 	cfg.ReportRetryMs = 10000
