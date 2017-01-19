@@ -10,6 +10,8 @@
       google.charts.setOnLoadCallback(drawCharts);
 
       var configs = {};
+      var MIN_SECONDS = 1800;
+      var MAX_SECONDS = 86400 * 2;
 
       function getTime() {
         return Math.floor((new Date).getTime() / 1000);
@@ -41,6 +43,10 @@
             'click', updateChartTime.bind(null, {{.Id}}, -{{.Seconds}}));
         document.getElementById('later-{{.Id}}').addEventListener(
             'click', updateChartTime.bind(null, {{.Id}}, {{.Seconds}}));
+        document.getElementById('less-{{.Id}}').addEventListener(
+            'click', scaleChartDuration.bind(null, {{.Id}}, 0.5));
+        document.getElementById('more-{{.Id}}').addEventListener(
+            'click', scaleChartDuration.bind(null, {{.Id}}, 2.0));
         {{end}}
       }
 
@@ -83,8 +89,25 @@
       function updateChartTime(id, offsetSec) {
         var config = configs[id];
         var duration = config.endTime - config.startTime;
-        config.endTime = Math.min(config.endTime + offsetSec, getTime());
+        var newEnd = Math.min(config.endTime + offsetSec, getTime());
+        if (newEnd == config.endTime)
+          return;
+        config.endTime = newEnd;
         config.startTime = config.endTime - duration;
+
+        loadData(config, function(data) {
+          config.chart.draw(parseResponse(data), config.options);
+        });
+      }
+
+      function scaleChartDuration(id, scale) {
+        var config = configs[id];
+        var oldDuration = config.endTime - config.startTime;
+        var newDuration =
+            Math.max(Math.min(oldDuration * scale, MAX_SECONDS), MIN_SECONDS);
+        if (oldDuration == newDuration)
+          return;
+        config.startTime = config.endTime - newDuration;
 
         loadData(config, function(data) {
           config.chart.draw(parseResponse(data), config.options);
@@ -113,7 +136,8 @@
         display: flex;
         justify-content: space-between;
         max-width: calc(100% - 20px);
-        width: 600px;
+        padding-left: 40px;
+        width: 400px;
       }
       .controls span {
         cursor: pointer;
@@ -121,20 +145,16 @@
       .controls span:hover {
         text-decoration: underline;
       }
-      .earlier {
-        margin-left: 65px;
-      }
-      .later {
-        margin-right: 85px;
-      }
     </style>
   </head>
 <body>
   {{range .Graphs}}
   <div id="{{.Id}}" class="chart{{if .Short}} short{{end}}"></div>
   <div class="controls">
-    <span id="earlier-{{.Id}}" class="earlier">Earlier</span>
-    <span id="later-{{.Id}}" class="later">Later</span>
+    <span id="earlier-{{.Id}}">Earlier</span>
+    <span id="later-{{.Id}}">Later</span>
+    <span id="less-{{.Id}}">Less</span>
+    <span id="more-{{.Id}}">More</span>
   </div>
   {{end}}
 </body>
