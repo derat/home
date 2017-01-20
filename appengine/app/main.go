@@ -53,8 +53,10 @@ type graphConfig struct {
 	// Number of seconds of data to graph.
 	Seconds int
 
-	// If true, vertical axis doesn't go below zero.
-	MinZero bool
+	// If empty or unsupplied, the Y-axis range is determined automatically.
+	// If one value is present, it is interpreted as the minimum value.
+	// If two values are present, they are interpreted as the min and max.
+	Range []float32
 
 	// If true, graph is shorter than usual.
 	Short bool
@@ -83,13 +85,14 @@ type config struct {
 
 // templateGraph is used to pass graph information to the template.
 type templateGraph struct {
-	Id        string
-	Title     string
-	Units     string
-	MinZero   bool
-	Short     bool
-	QueryPath string
-	Seconds   int
+	Id             string
+	Title          string
+	Units          string
+	HasMin, HasMax bool
+	Min, Max       float32
+	Short          bool
+	QueryPath      string
+	Seconds        int
 }
 
 var cfg *config
@@ -262,10 +265,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			Id:        fmt.Sprintf("graph%d", i),
 			Title:     g.Title,
 			Units:     g.Units,
-			MinZero:   g.MinZero,
 			Short:     g.Short,
 			QueryPath: queryPath,
 			Seconds:   g.Seconds,
+		}
+
+		if g.Range != nil && len(g.Range) > 0 {
+			d.Graphs[i].HasMin = true
+			d.Graphs[i].Min = g.Range[0]
+		}
+		if g.Range != nil && len(g.Range) > 1 {
+			d.Graphs[i].HasMax = true
+			d.Graphs[i].Max = g.Range[1]
 		}
 	}
 

@@ -35,10 +35,23 @@
         configs[{{.Id}}] = {
           path: {{.QueryPath}},
           startTime: now - {{.Seconds}},
-          endTime: now
+          endTime: now,
+          options: google.charts.Line.convertOptions({
+            chart: {
+              title: {{.Title}},
+            },
+            vAxis: {
+              title: {{.Units}},
+              viewWindow: {
+                min: {{if .HasMin}}{{.Min}}{{else}}null{{end}},
+                max: {{if .HasMax}}{{.Max}}{{else}}null{{end}}
+              }
+            },
+            interpolateNulls: true
+          })
         };
-        loadData(configs[{{.Id}}],
-            createChart.bind(null, {{.Id}}, {{.Title}}, {{.Units}}, {{.MinZero}}));
+
+        loadData(configs[{{.Id}}], createChart.bind(null, {{.Id}}));
         document.getElementById('earlier-{{.Id}}').addEventListener(
             'click', updateChartTime.bind(null, {{.Id}}, -{{.Seconds}}));
         document.getElementById('later-{{.Id}}').addEventListener(
@@ -68,20 +81,8 @@
         xhr.send(null);
       }
 
-      function createChart(id, title, units, minZero, data) {
+      function createChart(id, data) {
         var config = configs[id];
-        config.options = google.charts.Line.convertOptions({
-          chart: {
-            title: title,
-          },
-          vAxis: {
-            title: units,
-            viewWindow: {
-              min: minZero ? 0.0 : null
-            }
-          },
-          interpolateNulls: true
-        });
         config.chart = new google.charts.Line(document.getElementById(id));
         config.chart.draw(parseResponse(data), config.options);
       }
