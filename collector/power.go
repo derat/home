@@ -29,7 +29,9 @@ func parsePowerCommandOutput(cfg *config, out string, stats *powerStats) {
 	for _, line := range strings.Split(out, "\n") {
 		parts := strings.Fields(line)
 		if len(parts) != 2 {
-			cfg.Logger.Printf("Skipping bad power stats line %q")
+			if len(parts) != 0 {
+				cfg.Logger.Printf("Skipping bad power stats line %q", line)
+			}
 			continue
 		}
 		key := parts[0]
