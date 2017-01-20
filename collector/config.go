@@ -52,6 +52,18 @@ type config struct {
 	// seconds. See the ping command's -w flag for details.
 	PingTimeoutSec int
 
+	// Command to run to get information about the system's power state. The
+	// command should output lines of whitespace-separated key-value pairs:
+	//
+	// on_line          1      # 1 if on line power, 0 otherwise
+	// line_voltage     120.0
+	// load_percent     17.5   # [0.0, 100.0]
+	// battery_percent  95.5   # [0.0, 100.0]
+	PowerCommand string
+
+	// Time between power samples, in seconds.
+	PowerSampleIntervalSec int
+
 	Logger *log.Logger
 }
 
@@ -67,6 +79,7 @@ func readConfig(path string, logger *log.Logger) (*config, error) {
 	cfg.PingCount = 5
 	cfg.PingDelayMs = 1000
 	cfg.PingTimeoutSec = 20
+	cfg.PowerSampleIntervalSec = 120
 	cfg.Logger = logger
 
 	if len(path) != 0 {

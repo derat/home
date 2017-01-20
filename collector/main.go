@@ -35,6 +35,9 @@ func main() {
 	if cfg.PingHost != "" {
 		go runPingLoop(cfg, r)
 	}
+	if cfg.PowerCommand != "" {
+		go runPowerLoop(cfg, r)
+	}
 
 	l := &listener{cfg: cfg, rep: r}
 	if err = l.run(); err != nil {
