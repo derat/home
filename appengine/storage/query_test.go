@@ -4,9 +4,12 @@
 package storage
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 	"time"
+
+	"erat.org/home/common"
 )
 
 func makePoint(t int, value float32) point {
@@ -78,4 +81,112 @@ func TestMergeQueryData(t *testing.T) {
 			t.Errorf("Expected values %v at index %v; saw %v", exp.values, i, act.values)
 		}
 	}
+}
+
+func TestRunQuery(t *testing.T) {
+	c, done := initTest()
+	defer done()
+
+	type datarow struct {
+		ts string
+		v  []float64
+	}
+
+	checkQuery := func(labels, sourceNames []string, start, end time.Time, rows []datarow) {
+		type col struct {
+			Type  string `json:"type"`
+			Label string `json:"label"`
+		}
+		type cell struct {
+			Value interface{} `json:"v"`
+		}
+		type row struct {
+			Cells []cell `json:"c"`
+		}
+		type table struct {
+			Cols []col `json:"cols"`
+			Rows []row `json:"rows"`
+		}
+
+		b, err := RunQuery(c, labels, sourceNames, start, end, time.UTC)
+		if err != nil {
+			t.Fatalf("Query failed: %v", err)
+		}
+
+		tb := table{}
+		if err = json.Unmarshal(b.Bytes(), &tb); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		nc := len(sourceNames) + 1
+		if len(tb.Cols) != nc {
+			t.Errorf("Got %v column(s) instead of %v", len(tb.Cols), nc)
+		} else {
+			if tb.Cols[0].Type != "datetime" {
+				t.Errorf("Column 0 has type %q instead of %q", tb.Cols[0].Type, "datetime")
+			}
+			for i := range sourceNames {
+				if tb.Cols[i+1].Label != labels[i] {
+					t.Errorf("Column %i has label %q instead of %q", tb.Cols[i+1].Label, labels[i])
+				}
+				if tb.Cols[i+1].Type != "number" {
+					t.Errorf("Column %i has type %q instead of %q", tb.Cols[i+1].Type, "number")
+				}
+			}
+		}
+
+		if len(tb.Rows) != len(rows) {
+			t.Errorf("Got %v row(s) instead of %v", len(tb.Rows), len(rows))
+		} else {
+			for i, exp := range rows {
+				act := tb.Rows[i]
+				if len(act.Cells) != len(exp.v)+1 {
+					t.Errorf("Row %v has %v cell(s) instead of %v", i, len(act.Cells), len(exp.v)+1)
+				} else {
+					ts := act.Cells[0].Value.(string)
+					if ts != exp.ts {
+						t.Errorf("Row %v has timestamp %q instead of %q", i, ts, exp.ts)
+					}
+					for j, ev := range exp.v {
+						var av float64
+						if act.Cells[j+1].Value == nil {
+							av = math.NaN()
+						} else {
+							av = act.Cells[j+1].Value.(float64)
+						}
+						av_nan := av != av
+						ev_nan := ev != ev
+						if av_nan != ev_nan || (!av_nan && av != ev) {
+							t.Errorf("Row %v, col %v is %v instead of %v", i, j, av, ev)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	t1 := time.Unix(1, 0)
+	t2 := time.Unix(2, 0)
+	t3 := time.Unix(3, 0)
+	t4 := time.Unix(4, 0)
+	t5 := time.Unix(5, 0)
+	checkQuery([]string{"B"}, []string{"a|b"}, t2, t4, []datarow{})
+
+	if err := WriteSamples(c, []common.Sample{
+		common.Sample{t1, "a", "b", 0.25},
+		common.Sample{t2, "a", "b", 0.5},
+		common.Sample{t2, "a", "c", 0.75},
+		common.Sample{t2, "a", "d", 0.8},
+		common.Sample{t2, "b", "b", 0.9},
+		common.Sample{t3, "a", "b", 1.0},
+		common.Sample{t4, "a", "c", 1.25},
+		common.Sample{t5, "a", "b", 1.5},
+	}); err != nil {
+		t.Fatalf("Failed inserting samples: %v", err)
+	}
+	checkQuery([]string{"B", "C"}, []string{"a|b", "a|c"}, t2, t4, []datarow{
+		{"Date(1970,0,1,0,0,2)", []float64{0.5, 0.75}},
+		{"Date(1970,0,1,0,0,3)", []float64{1.0}},
+		{"Date(1970,0,1,0,0,4)", []float64{math.NaN(), 1.25}},
+	})
 }
