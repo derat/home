@@ -4,8 +4,9 @@
 package storage
 
 import (
-	"erat.org/home/common"
 	"fmt"
+
+	"erat.org/home/common"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 )
