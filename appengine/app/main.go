@@ -4,84 +4,28 @@
 package app
 
 import (
-	"erat.org/home/appengine/storage"
-	"erat.org/home/common"
 	"fmt"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/user"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"erat.org/home/appengine/storage"
+	"erat.org/home/common"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/user"
 )
 
 const (
-	// Config path relative to base app directory.
+	// Path of config file relative to base app directory.
 	configPath = "config.json"
 
 	// Path of template file relative to base app directory.
 	templatePath = "template.html"
-
-	// Hardcoded secret used when running dev app server.
-	devSecret = "secret"
-
-	// Duration of samples to display in graphs.
-	defaultGraphSec = 7200
 )
-
-// graphLineConfig describes a line within a graph.
-type graphLineConfig struct {
-	// Label displayed on graph.
-	Label string
-
-	// Source and name associated with samples.
-	Source string
-	Name   string
-}
-
-// graphConfig holds configuration for an individual graph.
-type graphConfig struct {
-	// Graph title.
-	Title string
-
-	// Human-units used as label for vertical axis.
-	Units string
-
-	// Number of seconds of data to graph.
-	Seconds int
-
-	// If empty or unsupplied, the Y-axis range is determined automatically.
-	// If one value is present, it is interpreted as the minimum value.
-	// If two values are present, they are interpreted as the min and max.
-	Range []float32
-
-	// If true, graph is shorter than usual.
-	Short bool
-
-	// Lines within the graph.
-	Lines []graphLineConfig
-}
-
-// config holds user-configurable top-level settings.
-type config struct {
-	// Secret used by collector to sign reports.
-	ReportSecret string
-
-	// Email addresses of authorized users.
-	Users []string
-
-	// Time zone, e.g. "America/Los_Angeles".
-	TimeZone string
-
-	// Page title.
-	Title string
-
-	// Graphs to display on page.
-	Graphs []graphConfig
-}
 
 // templateGraph is used to pass graph information to the template.
 type templateGraph struct {
@@ -99,32 +43,9 @@ var cfg *config
 var location *time.Location
 var tmpl *template.Template
 
-func loadConfig() error {
-	var err error
-	cfg = &config{}
-	if err = common.ReadJson(configPath, cfg); err != nil {
-		return err
-	}
-	if appengine.IsDevAppServer() {
-		cfg.ReportSecret = devSecret
-	}
-	if cfg.TimeZone == "" {
-		cfg.TimeZone = "America/Los_Angeles"
-	}
-	for i := range cfg.Graphs {
-		if cfg.Graphs[i].Seconds <= 0 {
-			cfg.Graphs[i].Seconds = defaultGraphSec
-		}
-	}
-	if location, err = time.LoadLocation(cfg.TimeZone); err != nil {
-		return err
-	}
-	return nil
-}
-
 func init() {
 	var err error
-	if err = loadConfig(); err != nil {
+	if cfg, location, err = loadConfig(configPath); err != nil {
 		panic(err)
 	}
 
