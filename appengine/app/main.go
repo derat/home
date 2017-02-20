@@ -92,8 +92,9 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := appengine.NewContext(r)
-	labels := strings.Split(r.FormValue("labels"), ",")
-	sourceNames := strings.Split(r.FormValue("names"), ",")
+	p := storage.QueryParams{}
+	p.Labels = strings.Split(r.FormValue("labels"), ",")
+	p.SourceNames = strings.Split(r.FormValue("names"), ",")
 
 	parseTime := func(s string) (time.Time, error) {
 		t, err := strconv.ParseInt(s, 10, 64)
@@ -104,12 +105,11 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 		return time.Unix(t, 0).In(location), nil
 	}
-	var start, end time.Time
 	var err error
-	if start, err = parseTime(r.FormValue("start")); err != nil {
+	if p.Start, err = parseTime(r.FormValue("start")); err != nil {
 		return
 	}
-	if end, err = parseTime(r.FormValue("end")); err != nil {
+	if p.End, err = parseTime(r.FormValue("end")); err != nil {
 		return
 	}
 
@@ -117,7 +117,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	// responses when errors are encountered mid-response. If that ends up being
 	// a problem, either use an intermediate buffer or add a way to communicate
 	// errors mid-response.
-	if err = storage.RunQuery(c, w, labels, sourceNames, start, end); err != nil {
+	if err = storage.RunQuery(c, w, p); err != nil {
 		log.Errorf(c, "Query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
 	}

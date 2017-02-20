@@ -110,7 +110,7 @@ func TestRunQuery(t *testing.T) {
 		}
 
 		b := &bytes.Buffer{}
-		if err := RunQuery(c, b, labels, sourceNames, start, end); err != nil {
+		if err := RunQuery(c, b, QueryParams{labels, sourceNames, start, end}); err != nil {
 			t.Fatalf("Query failed: %v", err)
 		}
 		tb := table{}

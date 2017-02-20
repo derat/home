@@ -136,12 +136,23 @@ func writeQueryOutput(w io.Writer, labels []string, ch chan timeData, loc *time.
 	return err
 }
 
-func RunQuery(c context.Context, w io.Writer, labels, sourceNames []string, start, end time.Time) error {
-	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
-	baseQuery = baseQuery.Filter("Timestamp >=", start).Filter("Timestamp <=", end)
+type QueryParams struct {
+	Labels      []string
+	SourceNames []string
+	Start       time.Time
+	End         time.Time
+}
 
-	chans := make([]chan point, len(sourceNames))
-	for i, sn := range sourceNames {
+func RunQuery(c context.Context, w io.Writer, p QueryParams) error {
+	if len(p.Labels) != len(p.SourceNames) {
+		return fmt.Errorf("Different numbers of labels and sourcenames")
+	}
+
+	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
+	baseQuery = baseQuery.Filter("Timestamp >=", p.Start).Filter("Timestamp <=", p.End)
+
+	chans := make([]chan point, len(p.SourceNames))
+	for i, sn := range p.SourceNames {
 		chans[i] = make(chan point)
 		parts := strings.Split(sn, "|")
 		if len(parts) != 2 {
@@ -167,5 +178,5 @@ func RunQuery(c context.Context, w io.Writer, labels, sourceNames []string, star
 
 	out := make(chan timeData)
 	go mergeQueryData(chans, out)
-	return writeQueryOutput(w, labels, out, start.Location())
+	return writeQueryOutput(w, p.Labels, out, p.Start.Location())
 }
