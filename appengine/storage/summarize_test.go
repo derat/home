@@ -17,14 +17,6 @@ func TestGenerateSummaries(t *testing.T) {
 	c, done := initTest()
 	defer done()
 
-	loc, err := time.LoadLocation("America/Los_Angeles")
-	if err != nil {
-		t.Fatalf("Failed to load location: %v", err)
-	}
-	d := func(year, month, day, hour, min, sec int) time.Time {
-		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
-	}
-
 	summariesToString := func(sums []*summary) string {
 		strs := make([]string, len(sums))
 		for i, s := range sums {
@@ -47,18 +39,41 @@ func TestGenerateSummaries(t *testing.T) {
 		}
 	}
 
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load location: %v", err)
+	}
+	lt := func(year, month, day, hour, min, sec int) time.Time {
+		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
+	}
+	const twoh = time.Duration(2) * time.Hour
+
 	if err := WriteSamples(c, []common.Sample{
-		common.Sample{d(2017, 1, 1, 0, 0, 0), "s0", "n0", 1.0},
-		common.Sample{d(2017, 1, 1, 0, 5, 0), "s0", "n0", 2.0},
-		common.Sample{d(2017, 1, 1, 0, 55, 0), "s0", "n0", 6.0},
-		common.Sample{d(2017, 1, 1, 1, 0, 0), "s0", "n0", 5.0},
-		common.Sample{d(2017, 1, 1, 1, 30, 0), "s0", "n0", 15.0},
+		common.Sample{lt(2017, 1, 1, 0, 0, 0), "s0", "n0", 1.0},
+		common.Sample{lt(2017, 1, 1, 0, 5, 0), "s0", "n0", 2.0},
+		common.Sample{lt(2017, 1, 1, 0, 55, 0), "s0", "n0", 6.0},
+		common.Sample{lt(2017, 1, 1, 1, 0, 0), "s0", "n0", 5.0},
+		common.Sample{lt(2017, 1, 1, 1, 30, 0), "s0", "n0", 15.0},
 
-		common.Sample{d(2017, 1, 1, 0, 8, 5), "s0", "n1", 3.0},
-		common.Sample{d(2017, 1, 2, 4, 6, 0), "s0", "n1", 8.0},
-		common.Sample{d(2017, 1, 3, 0, 0, 0), "s0", "n1", 5.0},
+		common.Sample{lt(2017, 1, 1, 0, 8, 5), "s0", "n1", 3.0},
+		common.Sample{lt(2017, 1, 2, 4, 6, 0), "s0", "n1", 8.0},
+		common.Sample{lt(2017, 1, 3, 0, 0, 0), "s0", "n1", 5.0},
 
-		common.Sample{d(2017, 1, 1, 0, 0, 0), "s1", "n0", 1.2},
+		common.Sample{lt(2017, 1, 1, 0, 0, 0), "s1", "n0", 1.2},
+
+		// In 2016, DST started on March 13 and ended on November 6.
+		common.Sample{lt(2016, 3, 13, 0, 15, 0), "s0", "n0", 1.0},
+		common.Sample{lt(2016, 3, 13, 1, 15, 0), "s0", "n0", 3.0},
+		common.Sample{lt(2016, 3, 13, 3, 15, 0), "s0", "n0", 5.0},
+		common.Sample{lt(2016, 3, 13, 23, 15, 0), "s0", "n0", 7.0},
+		common.Sample{lt(2016, 3, 14, 0, 15, 0), "s0", "n0", 9.0},
+		common.Sample{lt(2016, 11, 6, 0, 15, 0), "s0", "n0", 1.0},
+		common.Sample{lt(2016, 11, 6, 1, 15, 0), "s0", "n0", 3.0},
+		common.Sample{lt(2016, 11, 6, 1, 15, 0).Add(time.Hour), "s0", "n0", 5.0},
+		common.Sample{lt(2016, 11, 6, 1, 15, 0).Add(twoh), "s0", "n0", 7.0},
+		common.Sample{lt(2016, 11, 6, 3, 15, 0), "s0", "n0", 9.0},
+		common.Sample{lt(2016, 11, 6, 23, 15, 0), "s0", "n0", 11.0},
+		common.Sample{lt(2016, 11, 7, 0, 15, 0), "s0", "n0", 13.0},
 	}); err != nil {
 		t.Fatalf("Failed to insert samples: %v", err)
 	}
@@ -68,18 +83,34 @@ func TestGenerateSummaries(t *testing.T) {
 	}
 
 	checkSummaries(hourSummaryKind, []*summary{
-		&summary{d(2017, 1, 1, 0, 0, 0), "s0", "n0", 0, 1.0, 6.0, 3.0},
-		&summary{d(2017, 1, 1, 0, 0, 0), "s0", "n1", 0, 3.0, 3.0, 3.0},
-		&summary{d(2017, 1, 1, 0, 0, 0), "s1", "n0", 0, 1.2, 1.2, 1.2},
-		&summary{d(2017, 1, 1, 1, 0, 0), "s0", "n0", 0, 5.0, 15.0, 10.0},
-		&summary{d(2017, 1, 2, 4, 0, 0), "s0", "n1", 0, 8.0, 8.0, 8.0},
-		&summary{d(2017, 1, 3, 0, 0, 0), "s0", "n1", 0, 5.0, 5.0, 5.0},
+		&summary{lt(2016, 3, 13, 0, 0, 0), "s0", "n0", 0, 1.0, 1.0, 1.0},
+		&summary{lt(2016, 3, 13, 1, 0, 0), "s0", "n0", 0, 3.0, 3.0, 3.0},
+		&summary{lt(2016, 3, 13, 3, 0, 0), "s0", "n0", 0, 5.0, 5.0, 5.0},
+		&summary{lt(2016, 3, 13, 23, 0, 0), "s0", "n0", 0, 7.0, 7.0, 7.0},
+		&summary{lt(2016, 3, 14, 0, 0, 0), "s0", "n0", 0, 9.0, 9.0, 9.0},
+		&summary{lt(2016, 11, 6, 0, 0, 0), "s0", "n0", 0, 1.0, 1.0, 1.0},
+		&summary{lt(2016, 11, 6, 1, 0, 0), "s0", "n0", 0, 3.0, 3.0, 3.0},
+		&summary{lt(2016, 11, 6, 1, 0, 0).Add(time.Hour), "s0", "n0", 0, 5.0, 5.0, 5.0},
+		&summary{lt(2016, 11, 6, 1, 0, 0).Add(twoh), "s0", "n0", 0, 7.0, 7.0, 7.0},
+		&summary{lt(2016, 11, 6, 3, 0, 0), "s0", "n0", 0, 9.0, 9.0, 9.0},
+		&summary{lt(2016, 11, 6, 23, 0, 0), "s0", "n0", 0, 11.0, 11.0, 11.0},
+		&summary{lt(2016, 11, 7, 0, 0, 0), "s0", "n0", 0, 13.0, 13.0, 13.0},
+		&summary{lt(2017, 1, 1, 0, 0, 0), "s0", "n0", 0, 1.0, 6.0, 3.0},
+		&summary{lt(2017, 1, 1, 0, 0, 0), "s0", "n1", 0, 3.0, 3.0, 3.0},
+		&summary{lt(2017, 1, 1, 0, 0, 0), "s1", "n0", 0, 1.2, 1.2, 1.2},
+		&summary{lt(2017, 1, 1, 1, 0, 0), "s0", "n0", 0, 5.0, 15.0, 10.0},
+		&summary{lt(2017, 1, 2, 4, 0, 0), "s0", "n1", 0, 8.0, 8.0, 8.0},
+		&summary{lt(2017, 1, 3, 0, 0, 0), "s0", "n1", 0, 5.0, 5.0, 5.0},
 	})
 	checkSummaries(daySummaryKind, []*summary{
-		&summary{d(2017, 1, 1, 0, 0, 0), "s0", "n0", 0, 1.0, 15.0, 5.8},
-		&summary{d(2017, 1, 1, 0, 0, 0), "s0", "n1", 0, 3.0, 3.0, 3.0},
-		&summary{d(2017, 1, 1, 0, 0, 0), "s1", "n0", 0, 1.2, 1.2, 1.2},
-		&summary{d(2017, 1, 2, 0, 0, 0), "s0", "n1", 0, 8.0, 8.0, 8.0},
-		&summary{d(2017, 1, 3, 0, 0, 0), "s0", "n1", 0, 5.0, 5.0, 5.0},
+		&summary{lt(2016, 3, 13, 0, 0, 0), "s0", "n0", 0, 1.0, 7.0, 4.0},
+		&summary{lt(2016, 3, 14, 0, 0, 0), "s0", "n0", 0, 9.0, 9.0, 9.0},
+		&summary{lt(2016, 11, 6, 0, 0, 0), "s0", "n0", 0, 1.0, 11.0, 6.0},
+		&summary{lt(2016, 11, 7, 0, 0, 0), "s0", "n0", 0, 13.0, 13.0, 13.0},
+		&summary{lt(2017, 1, 1, 0, 0, 0), "s0", "n0", 0, 1.0, 15.0, 5.8},
+		&summary{lt(2017, 1, 1, 0, 0, 0), "s0", "n1", 0, 3.0, 3.0, 3.0},
+		&summary{lt(2017, 1, 1, 0, 0, 0), "s1", "n0", 0, 1.2, 1.2, 1.2},
+		&summary{lt(2017, 1, 2, 0, 0, 0), "s0", "n1", 0, 8.0, 8.0, 8.0},
+		&summary{lt(2017, 1, 3, 0, 0, 0), "s0", "n1", 0, 5.0, 5.0, 5.0},
 	})
 }

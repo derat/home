@@ -73,9 +73,8 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 			return err
 		}
 
-		t := s.Timestamp.In(loc)
-
-		ds := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+		lt := s.Timestamp.In(loc)
+		ds := time.Date(lt.Year(), lt.Month(), lt.Day(), 0, 0, 0, 0, lt.Location())
 		if dayStart != ds {
 			if len(daySums) > 0 {
 				writeSummaries(daySummaryKind, daySums)
@@ -85,7 +84,9 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 		}
 		updateSummary(daySums, &s, ds)
 
-		hs := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, loc)
+		// time.Date's handling of DST transitions is ambiguous, so use UTC.
+		ut := s.Timestamp.In(time.UTC)
+		hs := time.Date(ut.Year(), ut.Month(), ut.Day(), ut.Hour(), 0, 0, 0, ut.Location())
 		if hourStart != hs {
 			if len(hourSums) > 0 {
 				writeSummaries(hourSummaryKind, hourSums)
