@@ -4,6 +4,7 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/json"
 	"math"
 	"testing"
@@ -108,13 +109,12 @@ func TestRunQuery(t *testing.T) {
 			Rows []row `json:"rows"`
 		}
 
-		b, err := RunQuery(c, labels, sourceNames, start, end)
-		if err != nil {
+		b := &bytes.Buffer{}
+		if err := RunQuery(c, b, labels, sourceNames, start, end); err != nil {
 			t.Fatalf("Query failed: %v", err)
 		}
-
 		tb := table{}
-		if err = json.Unmarshal(b.Bytes(), &tb); err != nil {
+		if err := json.Unmarshal(b.Bytes(), &tb); err != nil {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 

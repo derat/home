@@ -4,11 +4,11 @@
 package storage
 
 import (
-	"bytes"
 	"erat.org/home/common"
 	"fmt"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -76,32 +76,39 @@ func mergeQueryData(in []chan point, out chan timeData) {
 	close(out)
 }
 
-func generateQueryOutput(labels []string, ch chan timeData, loc *time.Location) (*bytes.Buffer, error) {
-	buf := &bytes.Buffer{}
-	buf.WriteString("{\"cols\":[")
-	buf.WriteString("{\"type\":\"datetime\"}")
-	for _, l := range labels {
-		buf.WriteString(",{\"label\":\"")
-		buf.WriteString(l)
-		buf.WriteString("\",\"type\":\"number\"}")
+func writeQueryOutput(w io.Writer, labels []string, ch chan timeData, loc *time.Location) error {
+	var err error
+	write := func(s string) {
+		if err != nil {
+			return
+		}
+		_, err = w.Write([]byte(s))
 	}
-	buf.WriteString("],\"rows\":[")
+
+	write("{\"cols\":[")
+	write("{\"type\":\"datetime\"}")
+	for _, l := range labels {
+		write(",{\"label\":\"")
+		write(l)
+		write("\",\"type\":\"number\"}")
+	}
+	write("],\"rows\":[")
 	rowNum := 0
 	for d := range ch {
 		if d.err != nil {
-			return nil, d.err
+			return d.err
 		}
 
 		if rowNum > 0 {
-			buf.WriteString(",")
+			write(",")
 		}
 
 		// Well, this is awesome.
 		t := d.timestamp.In(loc)
-		buf.WriteString("{\"c\":[{\"v\":\"Date(")
-		buf.WriteString(fmt.Sprintf("%d,%d,%d,%d,%d,%d",
+		write("{\"c\":[{\"v\":\"Date(")
+		write(fmt.Sprintf("%d,%d,%d,%d,%d,%d",
 			t.Year(), int(t.Month())-1, t.Day(), t.Hour(), t.Minute(), t.Second()))
-		buf.WriteString(")\"}")
+		write(")\"}")
 
 		// Find the index of the last non-NaN value.
 		lastCol := -1
@@ -117,19 +124,19 @@ func generateQueryOutput(labels []string, ch chan timeData, loc *time.Location) 
 			} else {
 				val = strconv.FormatFloat(float64(d.values[i]), 'f', -1, 32)
 			}
-			buf.WriteString(",{\"v\":")
-			buf.WriteString(val)
-			buf.WriteString("}")
+			write(",{\"v\":")
+			write(val)
+			write("}")
 		}
 
-		buf.WriteString("]}")
+		write("]}")
 		rowNum++
 	}
-	buf.WriteString("]}")
-	return buf, nil
+	write("]}")
+	return err
 }
 
-func RunQuery(c context.Context, labels, sourceNames []string, start, end time.Time) (*bytes.Buffer, error) {
+func RunQuery(c context.Context, w io.Writer, labels, sourceNames []string, start, end time.Time) error {
 	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
 	baseQuery = baseQuery.Filter("Timestamp >=", start).Filter("Timestamp <=", end)
 
@@ -138,7 +145,7 @@ func RunQuery(c context.Context, labels, sourceNames []string, start, end time.T
 		chans[i] = make(chan point)
 		parts := strings.Split(sn, "|")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("Invalid 'source|name' string %q", sn)
+			return fmt.Errorf("Invalid 'source|name' string %q", sn)
 		}
 		q := baseQuery.Filter("Source =", parts[0]).Filter("Name =", parts[1])
 
@@ -160,5 +167,5 @@ func RunQuery(c context.Context, labels, sourceNames []string, start, end time.T
 
 	out := make(chan timeData)
 	go mergeQueryData(chans, out)
-	return generateQueryOutput(labels, out, start.Location())
+	return writeQueryOutput(w, labels, out, start.Location())
 }

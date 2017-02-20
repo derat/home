@@ -113,13 +113,14 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buf, err := storage.RunQuery(c, labels, sourceNames, start, end)
-	if err != nil {
+	// TODO: Passing the ResponseWriter here will probably produce malformed
+	// responses when errors are encountered mid-response. If that ends up being
+	// a problem, either use an intermediate buffer or add a way to communicate
+	// errors mid-response.
+	if err = storage.RunQuery(c, w, labels, sourceNames, start, end); err != nil {
 		log.Errorf(c, "Query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
-		return
 	}
-	w.Write(buf.Bytes())
 }
 
 func handleReport(w http.ResponseWriter, r *http.Request) {
