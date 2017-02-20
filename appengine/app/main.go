@@ -102,7 +102,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad time", http.StatusBadRequest)
 			return time.Time{}, err
 		}
-		return time.Unix(t, 0), nil
+		return time.Unix(t, 0).In(location), nil
 	}
 	var start, end time.Time
 	var err error
@@ -113,7 +113,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buf, err := storage.RunQuery(c, labels, sourceNames, start, end, location)
+	buf, err := storage.RunQuery(c, labels, sourceNames, start, end)
 	if err != nil {
 		log.Errorf(c, "Query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)

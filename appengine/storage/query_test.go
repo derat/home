@@ -108,7 +108,7 @@ func TestRunQuery(t *testing.T) {
 			Rows []row `json:"rows"`
 		}
 
-		b, err := RunQuery(c, labels, sourceNames, start, end, time.UTC)
+		b, err := RunQuery(c, labels, sourceNames, start, end)
 		if err != nil {
 			t.Fatalf("Query failed: %v", err)
 		}
@@ -165,11 +165,11 @@ func TestRunQuery(t *testing.T) {
 		}
 	}
 
-	t1 := time.Unix(1, 0)
-	t2 := time.Unix(2, 0)
-	t3 := time.Unix(3, 0)
-	t4 := time.Unix(4, 0)
-	t5 := time.Unix(5, 0)
+	t1 := time.Unix(1, 0).UTC()
+	t2 := time.Unix(2, 0).UTC()
+	t3 := time.Unix(3, 0).UTC()
+	t4 := time.Unix(4, 0).UTC()
+	t5 := time.Unix(5, 0).UTC()
 	checkQuery([]string{"B"}, []string{"a|b"}, t2, t4, []datarow{})
 
 	if err := WriteSamples(c, []common.Sample{
@@ -188,5 +188,16 @@ func TestRunQuery(t *testing.T) {
 		{"Date(1970,0,1,0,0,2)", []float64{0.5, 0.75}},
 		{"Date(1970,0,1,0,0,3)", []float64{1.0}},
 		{"Date(1970,0,1,0,0,4)", []float64{math.NaN(), 1.25}},
+	})
+
+	// The start time's location should be used to determine the output's time zone.
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("Failed to load location: %v", err)
+	}
+	checkQuery([]string{"B", "C"}, []string{"a|b", "a|c"}, t2.In(loc), t4.In(loc), []datarow{
+		{"Date(1969,11,31,16,0,2)", []float64{0.5, 0.75}},
+		{"Date(1969,11,31,16,0,3)", []float64{1.0}},
+		{"Date(1969,11,31,16,0,4)", []float64{math.NaN(), 1.25}},
 	})
 }

@@ -129,8 +129,7 @@ func generateQueryOutput(labels []string, ch chan timeData, loc *time.Location) 
 	return buf, nil
 }
 
-func RunQuery(c context.Context, labels, sourceNames []string,
-	start, end time.Time, loc *time.Location) (*bytes.Buffer, error) {
+func RunQuery(c context.Context, labels, sourceNames []string, start, end time.Time) (*bytes.Buffer, error) {
 	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
 	baseQuery = baseQuery.Filter("Timestamp >=", start).Filter("Timestamp <=", end)
 
@@ -161,5 +160,5 @@ func RunQuery(c context.Context, labels, sourceNames []string,
 
 	out := make(chan timeData)
 	go mergeQueryData(chans, out)
-	return generateQueryOutput(labels, out, loc)
+	return generateQueryOutput(labels, out, start.Location())
 }
