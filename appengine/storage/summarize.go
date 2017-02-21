@@ -48,6 +48,15 @@ func writeSummaries(c context.Context, ds map[string]*summary,
 	keys := make([]*datastore.Key, 0, summaryUpdateBatchSize)
 	sums := make([]*summary, 0, summaryUpdateBatchSize)
 
+	writeAndClear := func() error {
+		if _, err := datastore.PutMulti(c, keys, sums); err != nil {
+			return err
+		}
+		keys = make([]*datastore.Key, 0, summaryUpdateBatchSize)
+		sums = make([]*summary, 0, summaryUpdateBatchSize)
+		return nil
+	}
+
 	numSummaries := 0
 	add := func(kind string, s *summary) error {
 		numSummaries++
@@ -55,11 +64,9 @@ func writeSummaries(c context.Context, ds map[string]*summary,
 		keys = append(keys, datastore.NewKey(c, kind, id, 0, nil))
 		sums = append(sums, s)
 		if len(sums) == summaryUpdateBatchSize {
-			if _, err := datastore.PutMulti(c, keys, sums); err != nil {
+			if err := writeAndClear(); err != nil {
 				return err
 			}
-			keys = make([]*datastore.Key, 0, summaryUpdateBatchSize)
-			sums = make([]*summary, 0, summaryUpdateBatchSize)
 		}
 		return nil
 	}
@@ -78,7 +85,7 @@ func writeSummaries(c context.Context, ds map[string]*summary,
 		}
 	}
 	if len(sums) != 0 {
-		if _, err := datastore.PutMulti(c, keys, sums); err != nil {
+		if err := writeAndClear(); err != nil {
 			return err
 		}
 	}
@@ -125,14 +132,16 @@ func summarizeDay(c context.Context, loc *time.Location, queryStart time.Time) (
 
 		// time.Date's handling of DST transitions is ambiguous, so use UTC.
 		ut := s.Timestamp.In(time.UTC)
-		hourStart := time.Date(ut.Year(), ut.Month(), ut.Day(), ut.Hour(), 0, 0, 0, time.UTC)
+		hourStart := time.Date(
+			ut.Year(), ut.Month(), ut.Day(), ut.Hour(), 0, 0, 0, time.UTC)
 		if _, ok := hourSums[hourStart]; !ok {
 			hourSums[hourStart] = make(map[string]*summary)
 		}
 		updateSummary(hourSums[hourStart], &s, hourStart)
 	}
 
-	log.Debugf(c, "Processed %v samples in %v ms", numSamples, getMsecSinceTime(startTime))
+	log.Debugf(c, "Processed %v samples in %v ms",
+		numSamples, getMsecSinceTime(startTime))
 	return dayStart, writeSummaries(c, daySums, hourSums)
 }
 
