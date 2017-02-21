@@ -6,6 +6,7 @@ package app
 import (
 	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -58,6 +59,7 @@ func init() {
 		panic(err)
 	}
 
+	http.HandleFunc("/compact", handleCompact)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/report", handleReport)
 	http.HandleFunc("/", handleIndex)
@@ -85,6 +87,16 @@ func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
 	}
 
 	return false
+}
+
+func handleCompact(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if err := storage.GenerateSummaries(c, location); err != nil {
+		log.Errorf(c, "Generating summaries failed: %v", err)
+		http.Error(w, "Generating summaries failed", http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, "compaction done\n")
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +179,9 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	if err := storage.WriteSamples(c, samples); err != nil {
 		log.Errorf(c, "Failed to write %v sample(s) to datastore: %v", len(samples), err)
 		http.Error(w, "Write failed", http.StatusInternalServerError)
+		return
 	}
+	io.WriteString(w, "got it\n")
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {

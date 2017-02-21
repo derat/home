@@ -1,0 +1,4 @@
+cron:
+- description: compact data
+  url: /compact
+  schedule: every 1 hours
