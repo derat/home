@@ -10,6 +10,18 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
+- kind: DaySummary
+  properties:
+  - name: Name
+  - name: Source
+  - name: Timestamp
+
+- kind: HourSummary
+  properties:
+  - name: Name
+  - name: Source
+  - name: Timestamp
+
 - kind: Sample
   properties:
   - name: Name

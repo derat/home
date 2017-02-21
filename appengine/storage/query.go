@@ -17,11 +17,6 @@ import (
 
 const (
 	maxQueryResults = 60 * 24
-
-	// Thresholds for using hourly and daily averages instead of individual
-	// samples.
-	//queryHourThreshold = time.Duration(4) * time.Hour
-	//queryDayThreshold  = time.Duration(3*24) * time.Hour
 )
 
 type point struct {

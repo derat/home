@@ -14,8 +14,11 @@ const (
 	// Hardcoded secret used when running dev app server.
 	devSecret = "secret"
 
-	// Duration of samples to display in graphs.
+	// Default duration to display in graphs.
 	defaultGraphSec = 7200
+
+	// Default reporting interval.
+	defaultReportSec = 300
 )
 
 // graphLineConfig describes a line within a graph.
@@ -44,8 +47,12 @@ type graphConfig struct {
 	// If two values are present, they are interpreted as the min and max.
 	Range []float32
 
-	// If true, graph is shorter than usual.
+	// If true, graph uses less vertical space than usual.
 	Short bool
+
+	// Reporting interval in seconds. If accurate, aids in choosing when to
+	// graph hourly or daily averages instead of individual samples.
+	ReportSeconds int
 
 	// Lines within the graph.
 	Lines []graphLineConfig
@@ -84,6 +91,9 @@ func loadConfig(path string) (*config, *time.Location, error) {
 	for i := range c.Graphs {
 		if c.Graphs[i].Seconds <= 0 {
 			c.Graphs[i].Seconds = defaultGraphSec
+		}
+		if c.Graphs[i].ReportSeconds <= 0 {
+			c.Graphs[i].ReportSeconds = defaultReportSec
 		}
 	}
 	var loc *time.Location

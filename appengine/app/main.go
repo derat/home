@@ -37,6 +37,7 @@ type templateGraph struct {
 	Short          bool
 	QueryPath      string
 	Seconds        int
+	ReportSeconds  int
 }
 
 var cfg *config
@@ -92,11 +93,18 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := appengine.NewContext(r)
+
 	p := storage.QueryParams{}
 	p.Labels = strings.Split(r.FormValue("labels"), ",")
 	p.SourceNames = strings.Split(r.FormValue("names"), ",")
-	// TODO: Make granularity configurable in the request.
-	p.Granularity = storage.IndividualSample
+
+	if r.FormValue("summary") == "day" {
+		p.Granularity = storage.DailyAverage
+	} else if r.FormValue("summary") == "hour" {
+		p.Granularity = storage.HourlyAverage
+	} else {
+		p.Granularity = storage.IndividualSample
+	}
 
 	parseTime := func(s string) (time.Time, error) {
 		t, err := strconv.ParseInt(s, 10, 64)
@@ -186,12 +194,13 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			strings.Join(labels, ","), strings.Join(sns, ","))
 
 		d.Graphs[i] = templateGraph{
-			Id:        fmt.Sprintf("graph%d", i),
-			Title:     g.Title,
-			Units:     g.Units,
-			Short:     g.Short,
-			QueryPath: queryPath,
-			Seconds:   g.Seconds,
+			Id:            fmt.Sprintf("graph%d", i),
+			Title:         g.Title,
+			Units:         g.Units,
+			Short:         g.Short,
+			QueryPath:     queryPath,
+			Seconds:       g.Seconds,
+			ReportSeconds: g.ReportSeconds,
 		}
 
 		if g.Range != nil && len(g.Range) > 0 {

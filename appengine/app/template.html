@@ -11,7 +11,8 @@
 
       var configs = {};
       var MIN_SECONDS = 1800;
-      var MAX_SECONDS = 86400 * 2;
+      var MAX_SECONDS = 86400 * 100;
+      var MAX_POINTS = 100;
 
       function getTime() {
         return Math.floor((new Date).getTime() / 1000);
@@ -36,6 +37,7 @@
           path: {{.QueryPath}},
           startTime: now - {{.Seconds}},
           endTime: now,
+          reportSec: {{.ReportSeconds}},
           options: google.charts.Line.convertOptions({
             chart: {
               title: {{.Title}},
@@ -65,6 +67,14 @@
 
       function loadData(config, cb) {
         var path = config.path + "&start=" + config.startTime + "&end=" + config.endTime;
+
+        var duration = config.endTime - config.startTime;
+        if (duration / 3600 > MAX_POINTS) {
+          path += "&summary=day";
+        } else if (duration / config.reportSec > MAX_POINTS) {
+          path += "&summary=hour";
+        }
+
         console.log("Requesting " + path);
         var xhr = new XMLHttpRequest();
         xhr.open('GET', path, true);
@@ -105,7 +115,7 @@
         var config = configs[id];
         var oldDuration = config.endTime - config.startTime;
         var newDuration =
-            Math.max(Math.min(oldDuration * scale, MAX_SECONDS), MIN_SECONDS);
+            Math.max(Math.min(Math.round(oldDuration * scale), MAX_SECONDS), MIN_SECONDS);
         if (oldDuration == newDuration)
           return;
         config.startTime = config.endTime - newDuration;
