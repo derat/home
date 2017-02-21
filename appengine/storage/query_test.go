@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"erat.org/home/appengine/test"
 	"erat.org/home/common"
 	"golang.org/x/net/context"
 )
@@ -163,7 +164,7 @@ func TestMergeQueryData(t *testing.T) {
 }
 
 func TestRunQuery(t *testing.T) {
-	c, done := initTest()
+	c, done := test.InitTest()
 	defer done()
 
 	t1 := time.Unix(1, 0).UTC()
@@ -209,7 +210,7 @@ func TestRunQuery(t *testing.T) {
 }
 
 func TestRunQuerySummary(t *testing.T) {
-	c, done := initTest()
+	c, done := test.InitTest()
 	defer done()
 
 	loc, err := time.LoadLocation("America/Los_Angeles")

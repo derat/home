@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"erat.org/home/appengine/test"
 	"erat.org/home/common"
+	"google.golang.org/appengine/datastore"
 )
 
 func TestWriteSamples(t *testing.T) {
-	c, done := initTest()
+	c, done := test.InitTest()
 	defer done()
 
 	const (
@@ -35,8 +37,9 @@ func TestWriteSamples(t *testing.T) {
 		t.Errorf("failed to write samples: %v", err)
 	}
 
-	actual, err := getAllSamples(c)
-	if err != nil {
+	q := datastore.NewQuery(sampleKind).Order("Timestamp").Order("Source").Order("Name")
+	actual := make([]*common.Sample, 0)
+	if _, err := q.GetAll(c, &actual); err != nil {
 		t.Fatalf("failed to read samples: %v", err)
 	}
 	as := common.JoinSamples(actual)

@@ -9,12 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"erat.org/home/appengine/test"
 	"erat.org/home/common"
 	"google.golang.org/appengine/datastore"
 )
 
 func TestGenerateSummaries(t *testing.T) {
-	c, done := initTest()
+	c, done := test.InitTest()
 	defer done()
 
 	summariesToString := func(sums []*summary) string {
