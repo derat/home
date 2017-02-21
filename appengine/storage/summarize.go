@@ -11,6 +11,7 @@ import (
 	"erat.org/home/common"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
 )
 
 func updateSummary(sums map[string]*summary, sam *common.Sample, ts time.Time) {
@@ -64,6 +65,8 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 		}()
 	}
 
+	numSamples := 0
+	startTime := time.Now()
 	it := datastore.NewQuery(sampleKind).Order("Timestamp").Run(c)
 	for {
 		var s common.Sample
@@ -72,6 +75,7 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 		} else if err != nil {
 			return err
 		}
+		numSamples++
 
 		lt := s.Timestamp.In(loc)
 		ds := time.Date(lt.Year(), lt.Month(), lt.Day(), 0, 0, 0, 0, lt.Location())
@@ -109,5 +113,8 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 			return err
 		}
 	}
+
+	log.Debugf(c, "Summarized %v sample(s) in %v write(s) in %v ms",
+		numSamples, numWrites, getMsecSinceTime(startTime))
 	return nil
 }
