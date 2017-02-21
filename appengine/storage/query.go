@@ -17,6 +17,11 @@ import (
 
 const (
 	maxQueryResults = 60 * 24
+
+	// Thresholds for using hourly and daily averages instead of individual
+	// samples.
+	//queryHourThreshold = time.Duration(4) * time.Hour
+	//queryDayThreshold  = time.Duration(3*24) * time.Hour
 )
 
 type point struct {
@@ -136,11 +141,20 @@ func writeQueryOutput(w io.Writer, labels []string, ch chan timeData, loc *time.
 	return err
 }
 
+type QueryGranularity int
+
+const (
+	IndividualSample QueryGranularity = iota
+	HourlyAverage
+	DailyAverage
+)
+
 type QueryParams struct {
 	Labels      []string
 	SourceNames []string
 	Start       time.Time
 	End         time.Time
+	Granularity QueryGranularity
 }
 
 func RunQuery(c context.Context, w io.Writer, p QueryParams) error {
@@ -148,7 +162,14 @@ func RunQuery(c context.Context, w io.Writer, p QueryParams) error {
 		return fmt.Errorf("Different numbers of labels and sourcenames")
 	}
 
-	baseQuery := datastore.NewQuery(sampleKind).Limit(maxQueryResults).Order("Timestamp")
+	kind := sampleKind
+	if p.Granularity == HourlyAverage {
+		kind = hourSummaryKind
+	} else if p.Granularity == DailyAverage {
+		kind = daySummaryKind
+	}
+
+	baseQuery := datastore.NewQuery(kind).Limit(maxQueryResults).Order("Timestamp")
 	baseQuery = baseQuery.Filter("Timestamp >=", p.Start).Filter("Timestamp <=", p.End)
 
 	chans := make([]chan point, len(p.SourceNames))
@@ -161,17 +182,31 @@ func RunQuery(c context.Context, w io.Writer, p QueryParams) error {
 		q := baseQuery.Filter("Source =", parts[0]).Filter("Name =", parts[1])
 
 		go func(q *datastore.Query, ch chan point) {
+			var s interface{}
+			var mp func(s interface{}) point
+
+			if p.Granularity == IndividualSample {
+				s = &common.Sample{}
+				mp = func(s interface{}) point {
+					return point{s.(*common.Sample).Timestamp, s.(*common.Sample).Value, nil}
+				}
+			} else {
+				s = &summary{}
+				mp = func(s interface{}) point {
+					return point{s.(*summary).Timestamp, s.(*summary).AvgValue, nil}
+				}
+			}
+
 			it := q.Run(c)
 			for {
-				var s common.Sample
-				if _, err := it.Next(&s); err == datastore.Done {
+				if _, err := it.Next(s); err == datastore.Done {
 					close(ch)
 					break
 				} else if err != nil {
 					ch <- point{time.Time{}, 0, err}
 					break
 				}
-				ch <- point{s.Timestamp, s.Value, nil}
+				ch <- mp(s)
 			}
 		}(q, chans[i])
 	}

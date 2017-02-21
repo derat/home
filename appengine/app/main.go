@@ -95,6 +95,8 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	p := storage.QueryParams{}
 	p.Labels = strings.Split(r.FormValue("labels"), ",")
 	p.SourceNames = strings.Split(r.FormValue("names"), ",")
+	// TODO: Make granularity configurable in the request.
+	p.Granularity = storage.IndividualSample
 
 	parseTime := func(s string) (time.Time, error) {
 		t, err := strconv.ParseInt(s, 10, 64)

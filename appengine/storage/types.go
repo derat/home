@@ -17,11 +17,11 @@ const (
 )
 
 type summary struct {
-	StartTimestamp time.Time
-	Source         string
-	Name           string
-	NumValues      int     `datastore:"-"`
-	MinValue       float32 `datastore:",noindex"`
-	MaxValue       float32 `datastore:",noindex"`
-	AvgValue       float32 `datastore:",noindex"`
+	Timestamp time.Time
+	Source    string
+	Name      string
+	NumValues int     `datastore:"-"`
+	MinValue  float32 `datastore:",noindex"`
+	MaxValue  float32 `datastore:",noindex"`
+	AvgValue  float32 `datastore:",noindex"`
 }

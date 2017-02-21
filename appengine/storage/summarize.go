@@ -16,8 +16,8 @@ import (
 func updateSummary(sums map[string]*summary, sam *common.Sample, ts time.Time) {
 	sn := fmt.Sprintf("%s|%s", sam.Source, sam.Name)
 	if sum, ok := sums[sn]; ok {
-		if sum.StartTimestamp != ts {
-			panic(fmt.Sprintf("summary for %v starts at %v instead of %v", sn, sum.StartTimestamp, ts))
+		if sum.Timestamp != ts {
+			panic(fmt.Sprintf("summary for %v starts at %v instead of %v", sn, sum.Timestamp, ts))
 		}
 		sum.NumValues += 1
 		sum.MinValue = float32(math.Min(float64(sam.Value), float64(sum.MinValue)))
@@ -26,13 +26,13 @@ func updateSummary(sums map[string]*summary, sam *common.Sample, ts time.Time) {
 			sam.Value*(1/float32(sum.NumValues))
 	} else {
 		sums[sn] = &summary{
-			StartTimestamp: ts,
-			Source:         sam.Source,
-			Name:           sam.Name,
-			NumValues:      1,
-			MinValue:       sam.Value,
-			MaxValue:       sam.Value,
-			AvgValue:       sam.Value,
+			Timestamp: ts,
+			Source:    sam.Source,
+			Name:      sam.Name,
+			NumValues: 1,
+			MinValue:  sam.Value,
+			MaxValue:  sam.Value,
+			AvgValue:  sam.Value,
 		}
 	}
 }
@@ -51,7 +51,7 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 		sums := make([]*summary, len(m))
 		i := 0
 		for _, s := range m {
-			id := fmt.Sprintf("%d|%s|%s", s.StartTimestamp.Unix(), s.Source, s.Name)
+			id := fmt.Sprintf("%d|%s|%s", s.Timestamp.Unix(), s.Source, s.Name)
 			keys[i] = datastore.NewKey(c, kind, id, 0, nil)
 			sums[i] = s
 			i++

@@ -21,13 +21,13 @@ func TestGenerateSummaries(t *testing.T) {
 		strs := make([]string, len(sums))
 		for i, s := range sums {
 			strs[i] = fmt.Sprintf("%d|%s|%s|%.1f|%.1f|%.1f",
-				s.StartTimestamp.Unix(), s.Source, s.Name, s.MinValue, s.MaxValue, s.AvgValue)
+				s.Timestamp.Unix(), s.Source, s.Name, s.MinValue, s.MaxValue, s.AvgValue)
 		}
 		return strings.Join(strs, ",")
 	}
 
 	checkSummaries := func(kind string, es []*summary) {
-		q := datastore.NewQuery(kind).Order("StartTimestamp").Order("Source").Order("Name")
+		q := datastore.NewQuery(kind).Order("Timestamp").Order("Source").Order("Name")
 		as := make([]*summary, 0)
 		if _, err := q.GetAll(c, &as); err != nil {
 			t.Fatalf("Failed to get summaries: %v", err)
