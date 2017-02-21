@@ -88,70 +88,67 @@ func writeSummaries(c context.Context, ds map[string]*summary,
 	return nil
 }
 
-func summarizeDay(c context.Context, dayStart time.Time) error {
-	log.Debugf(c, "Generating summaries for %4d-%02d-%02d",
-		dayStart.Year(), dayStart.Month(), dayStart.Day())
-
+// summarizeDay reads samples starting at queryStart and generates summaries for
+// the first day it sees (as interpreted for loc). It returns the start of that
+// day, or a zero time if no samples were found.
+func summarizeDay(c context.Context, loc *time.Location, queryStart time.Time) (
+	dayStart time.Time, err error) {
 	// Keyed by "source|name".
 	daySums := make(map[string]*summary)
 	hourSums := make(map[time.Time]map[string]*summary)
 
+	q := datastore.NewQuery(sampleKind).Order("Timestamp")
+	if !queryStart.IsZero() {
+		q = q.Filter("Timestamp >=", queryStart)
+	}
+
 	numSamples := 0
 	startTime := time.Now()
-	q := datastore.NewQuery(sampleKind).Order("Timestamp").
-		Filter("Timestamp >=", dayStart).Filter("Timestamp <", dayStart.AddDate(0, 0, 1))
 	it := q.Run(c)
 	for {
 		var s common.Sample
 		if _, err := it.Next(&s); err == datastore.Done {
 			break
 		} else if err != nil {
-			return err
+			return time.Time{}, err
 		}
 		numSamples++
 
+		lt := s.Timestamp.In(loc)
+		ds := time.Date(lt.Year(), lt.Month(), lt.Day(), 0, 0, 0, 0, loc)
+		if dayStart.IsZero() {
+			dayStart = ds
+		} else if ds != dayStart {
+			break
+		}
 		updateSummary(daySums, &s, dayStart)
 
 		// time.Date's handling of DST transitions is ambiguous, so use UTC.
 		ut := s.Timestamp.In(time.UTC)
-		hourStart := time.Date(ut.Year(), ut.Month(), ut.Day(), ut.Hour(), 0, 0, 0, ut.Location())
+		hourStart := time.Date(ut.Year(), ut.Month(), ut.Day(), ut.Hour(), 0, 0, 0, time.UTC)
 		if _, ok := hourSums[hourStart]; !ok {
 			hourSums[hourStart] = make(map[string]*summary)
 		}
 		updateSummary(hourSums[hourStart], &s, hourStart)
 	}
 
-	log.Debugf(c, "Processed %v samples in %v ms",
-		numSamples, getMsecSinceTime(startTime))
-	return writeSummaries(c, daySums, hourSums)
+	log.Debugf(c, "Processed %v samples in %v ms", numSamples, getMsecSinceTime(startTime))
+	return dayStart, writeSummaries(c, daySums, hourSums)
 }
 
 func GenerateSummaries(c context.Context, loc *time.Location) error {
-	getTimestamp := func(order string) (time.Time, error) {
-		it := datastore.NewQuery(sampleKind).Order(order).Limit(1).Run(c)
-		var s common.Sample
-		if _, err := it.Next(&s); err == datastore.Done {
-			return time.Time{}, nil
-		} else if err != nil {
-			return time.Time{}, err
-		}
-		return s.Timestamp.In(loc), nil
-	}
-
 	var err error
-	var min, max time.Time
-	if min, err = getTimestamp("Timestamp"); err != nil {
-		return err
-	}
-	if max, err = getTimestamp("-Timestamp"); err != nil {
-		return err
-	}
-
-	ds := time.Date(min.Year(), min.Month(), min.Day(), 0, 0, 0, 0, loc)
-	for ; !max.Before(ds); ds = ds.AddDate(0, 0, 1) {
-		if err := summarizeDay(c, ds); err != nil {
+	dayStart := time.Time{}
+	for {
+		dayStart, err = summarizeDay(c, loc, dayStart)
+		if err != nil {
 			return err
+		} else if dayStart.IsZero() {
+			break
 		}
+		log.Debugf(c, "Finished summarizing %4d-%02d-%02d",
+			dayStart.Year(), dayStart.Month(), dayStart.Day())
+		dayStart = dayStart.AddDate(0, 0, 1)
 	}
 	return nil
 }
