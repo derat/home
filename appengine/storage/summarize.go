@@ -201,6 +201,8 @@ func GenerateSummaries(c context.Context, now time.Time, fullDayDelay time.Durat
 			dayStart.Year(), dayStart.Month(), dayStart.Day())
 
 		if dayStart.Before(partialDay) {
+			log.Debugf(c, "Marking %4d-%02d-%02d as fully summarized",
+				dayStart.Year(), dayStart.Month(), dayStart.Day())
 			k := datastore.NewKey(c, summaryStateKind, "", summaryStateId, nil)
 			if _, err := datastore.Put(c, k, &summaryState{dayStart}); err != nil {
 				return err
