@@ -6,6 +6,7 @@ package storage
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -111,6 +112,33 @@ func checkQuery(t *testing.T, c context.Context, p QueryParams, rows []datarow) 
 	}
 }
 
+func TestAveragePoints(t *testing.T) {
+	f := func(p point) string {
+		return fmt.Sprintf("%v|%.1f", p.timestamp.Unix(), p.value)
+	}
+
+	for _, tc := range []struct {
+		in  []point
+		exp point
+	}{
+		{[]point{}, point{}},
+		{[]point{point{time.Unix(10, 0), 5.0, nil}}, point{time.Unix(10, 0), 5.0, nil}},
+		{[]point{
+			point{time.Unix(10, 0), 1.0, nil},
+			point{time.Unix(20, 0), 2.0, nil},
+			point{time.Unix(30, 0), 3.0, nil},
+			point{time.Unix(40, 0), 4.0, nil},
+		}, point{time.Unix(25, 0), 2.5, nil}},
+	} {
+		a := f(averagePoints(tc.in))
+		e := f(tc.exp)
+		if a != e {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
+}
+
 func TestMergeQueryData(t *testing.T) {
 	chans := make([]chan point, 6)
 	chanData := [][]point{
@@ -171,7 +199,7 @@ func TestRunQuery(t *testing.T) {
 	t4 := time.Unix(4, 0).UTC()
 	t5 := time.Unix(5, 0).UTC()
 	checkQuery(t, c,
-		QueryParams{[]string{"B"}, []string{"a|b"}, t2, t4, IndividualSample}, []datarow{})
+		QueryParams{[]string{"B"}, []string{"a|b"}, t2, t4, IndividualSample, 1}, []datarow{})
 
 	if err := WriteSamples(c, []common.Sample{
 		common.Sample{t1, "a", "b", 0.25},
@@ -186,7 +214,7 @@ func TestRunQuery(t *testing.T) {
 		t.Fatalf("Failed inserting samples: %v", err)
 	}
 	checkQuery(t, c,
-		QueryParams{[]string{"B", "C"}, []string{"a|b", "a|c"}, t2, t4, IndividualSample},
+		QueryParams{[]string{"B", "C"}, []string{"a|b", "a|c"}, t2, t4, IndividualSample, 1},
 		[]datarow{
 			{"Date(1970,0,1,0,0,2)", []float64{0.5, 0.75}},
 			{"Date(1970,0,1,0,0,3)", []float64{1.0}},
@@ -196,7 +224,7 @@ func TestRunQuery(t *testing.T) {
 	// The start time's location should be used to determine the output's time zone.
 	checkQuery(t, c,
 		QueryParams{[]string{"B", "C"}, []string{"a|b", "a|c"},
-			t2.In(testLoc), t4.In(testLoc), IndividualSample},
+			t2.In(testLoc), t4.In(testLoc), IndividualSample, 1},
 		[]datarow{
 			{"Date(1969,11,31,16,0,2)", []float64{0.5, 0.75}},
 			{"Date(1969,11,31,16,0,3)", []float64{1.0}},
@@ -228,6 +256,7 @@ func TestRunQuerySummary(t *testing.T) {
 			lt(2015, 7, 3, 0, 0, 0),
 			lt(2015, 7, 3, 2, 0, 0),
 			IndividualSample,
+			1,
 		},
 		[]datarow{
 			{"Date(2015,6,3,0,0,0)", []float64{3.0}},
@@ -243,6 +272,7 @@ func TestRunQuerySummary(t *testing.T) {
 			lt(2015, 7, 3, 0, 0, 0),
 			lt(2015, 7, 3, 4, 0, 0),
 			HourlyAverage,
+			1,
 		},
 		[]datarow{
 			{"Date(2015,6,3,0,0,0)", []float64{3.5}},
@@ -256,10 +286,52 @@ func TestRunQuerySummary(t *testing.T) {
 			lt(2015, 7, 1, 0, 0, 0),
 			lt(2015, 7, 4, 0, 0, 0),
 			DailyAverage,
+			1,
 		},
 		[]datarow{
 			{"Date(2015,6,1,0,0,0)", []float64{1.0}},
 			{"Date(2015,6,2,0,0,0)", []float64{2.0}},
 			{"Date(2015,6,3,0,0,0)", []float64{4.5}},
+		})
+}
+
+func TestRunQueryAggregate(t *testing.T) {
+	c := initTest()
+
+	if err := WriteSamples(c, []common.Sample{
+		common.Sample{lt(2015, 7, 1, 0, 0, 0), "a", "b", 1.0},
+		common.Sample{lt(2015, 7, 1, 0, 1, 0), "a", "b", 2.0},
+		common.Sample{lt(2015, 7, 1, 0, 2, 0), "a", "b", 3.0},
+		common.Sample{lt(2015, 7, 1, 0, 3, 0), "a", "b", 4.0},
+		common.Sample{lt(2015, 7, 1, 0, 4, 0), "a", "b", 5.0},
+		common.Sample{lt(2015, 7, 1, 0, 5, 0), "a", "b", 6.0},
+	}); err != nil {
+		t.Fatalf("Failed inserting samples: %v", err)
+	}
+
+	l := []string{"A"}
+	sn := []string{"a|b"}
+	start := lt(2015, 7, 1, 0, 0, 0)
+	end := lt(2015, 7, 2, 0, 0, 0)
+
+	checkQuery(t, c, QueryParams{l, sn, start, end, IndividualSample, 2},
+		[]datarow{
+			{"Date(2015,6,1,0,0,30)", []float64{1.5}},
+			{"Date(2015,6,1,0,2,30)", []float64{3.5}},
+			{"Date(2015,6,1,0,4,30)", []float64{5.5}},
+		})
+	checkQuery(t, c, QueryParams{l, sn, start, end, IndividualSample, 3},
+		[]datarow{
+			{"Date(2015,6,1,0,1,0)", []float64{2.0}},
+			{"Date(2015,6,1,0,4,0)", []float64{5.0}},
+		})
+	checkQuery(t, c, QueryParams{l, sn, start, end, IndividualSample, 4},
+		[]datarow{
+			{"Date(2015,6,1,0,1,30)", []float64{2.5}},
+			{"Date(2015,6,1,0,4,30)", []float64{5.5}},
+		})
+	checkQuery(t, c, QueryParams{l, sn, start, end, IndividualSample, 6},
+		[]datarow{
+			{"Date(2015,6,1,0,2,30)", []float64{3.5}},
 		})
 }
