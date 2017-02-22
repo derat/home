@@ -235,6 +235,7 @@ func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep i
 		Filter("Timestamp <", keepDay).Limit(summaryDeleteBatchSize)
 	for {
 		var keys []*datastore.Key
+		log.Debugf(c, "Querying for samples")
 		if keys, err = q.GetAll(c, nil); err != nil {
 			return err
 		} else if len(keys) == 0 {
