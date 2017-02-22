@@ -19,6 +19,13 @@ var testLoc *time.Location
 var testInst aetest.Instance
 
 func initTest() context.Context {
+	var err error
+	if testInst == nil {
+		testInst, err = aetest.NewInstance(&aetest.Options{StronglyConsistentDatastore: true})
+		if err != nil {
+			panic(err)
+		}
+	}
 	req, err := testInst.NewRequest("GET", "/", nil)
 	if err != nil {
 		panic(err)
@@ -64,11 +71,12 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	testInst, err = aetest.NewInstance(&aetest.Options{StronglyConsistentDatastore: true})
-	if err != nil {
-		panic(err)
-	}
-	defer func() { testInst.Close() }()
+
+	defer func() {
+		if testInst != nil {
+			testInst.Close()
+		}
+	}()
 
 	os.Exit(m.Run())
 }
