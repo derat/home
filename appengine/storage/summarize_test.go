@@ -182,3 +182,51 @@ func TestGenerateSummariesSaveProgress(t *testing.T) {
 	checkSummaries(t, c, daySummaryKind, sums)
 	checkSummaries(t, c, hourSummaryKind, sums)
 }
+
+func TestDeleteSummarizedSamples(t *testing.T) {
+	c, done, loc := test.InitTest()
+	defer done()
+
+	lt := func(year, month, day, hour, min, sec int) time.Time {
+		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
+	}
+
+	s10 := common.Sample{lt(2017, 1, 1, 0, 0, 0), "s", "n", 1.0}
+	s11 := common.Sample{lt(2017, 1, 1, 23, 59, 59), "s", "n", 1.0}
+	s20 := common.Sample{lt(2017, 1, 2, 0, 0, 0), "s", "n", 1.0}
+	s21 := common.Sample{lt(2017, 1, 2, 23, 59, 59), "s", "n", 1.0}
+	s30 := common.Sample{lt(2017, 1, 3, 0, 0, 0), "s", "n", 1.0}
+	s31 := common.Sample{lt(2017, 1, 3, 23, 59, 59), "s", "n", 1.0}
+	s40 := common.Sample{lt(2017, 1, 4, 0, 0, 0), "s", "n", 1.0}
+	s41 := common.Sample{lt(2017, 1, 4, 23, 59, 59), "s", "n", 1.0}
+
+	t50 := lt(2017, 1, 5, 0, 0, 0)
+
+	// Generate summaries such that the 3rd is the last full day.
+	if err := WriteSamples(c,
+		[]common.Sample{s10, s11, s20, s21, s30, s31, s40, s41}); err != nil {
+		t.Fatalf("Failed to insert samples: %v", err)
+	}
+	if err := GenerateSummaries(c, t50, time.Hour); err != nil {
+		t.Fatalf("Failed to generate summaries: %v", err)
+	}
+
+	// Request keeping the last two fully-summarized days. Only the 1st should
+	// be deleted.
+	if err := DeleteSummarizedSamples(c, loc, 2); err != nil {
+		t.Fatalf("Failed to delete summarized samples: %v", err)
+	}
+	test.CheckSamples(t, c, sampleKind, []common.Sample{s20, s21, s30, s31, s40, s41})
+
+	// Now only keep one day and check that the 2nd is also deleted.
+	if err := DeleteSummarizedSamples(c, loc, 1); err != nil {
+		t.Fatalf("Failed to delete summarized samples: %v", err)
+	}
+	test.CheckSamples(t, c, sampleKind, []common.Sample{s30, s31, s40, s41})
+
+	// Keeping zero days should also delete the 3rd.
+	if err := DeleteSummarizedSamples(c, loc, 0); err != nil {
+		t.Fatalf("Failed to delete summarized samples: %v", err)
+	}
+	test.CheckSamples(t, c, sampleKind, []common.Sample{s40, s41})
+}

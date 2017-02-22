@@ -18,6 +18,7 @@ const (
 	defaultGraphSec        = 7200
 	defaultReportSec       = 300
 	defaultFullDayDelaySec = 24 * 3600
+	defaultDaysToKeep      = 3
 )
 
 // graphLineConfig describes a line within a graph.
@@ -71,6 +72,10 @@ type config struct {
 	// Page title.
 	Title string
 
+	// Days of fully-summarized samples to keep. Older samples are deleted
+	// periodically.
+	DaysToKeep int
+
 	// Number of seconds to wait after the end of a day before assuming that we
 	// won't get any new samples for it (and don't need to continue
 	// re-summarizing it).
@@ -91,6 +96,10 @@ func loadConfig(path string) (*config, *time.Location, error) {
 	}
 	if c.TimeZone == "" {
 		c.TimeZone = "America/Los_Angeles"
+	}
+	// TODO: Add some way to permit specifying 0.
+	if c.DaysToKeep <= 0 {
+		c.DaysToKeep = defaultDaysToKeep
 	}
 	if c.FullDayDelaySeconds <= 0 {
 		c.FullDayDelaySeconds = defaultFullDayDelaySec

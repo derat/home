@@ -2,3 +2,6 @@ cron:
 - description: summarize data
   url: /summarize
   schedule: every 1 hours
+- description: purge data
+  url: /purge
+  schedule: every 2 hours

@@ -17,6 +17,7 @@ import (
 const (
 	// App Engine imposes a limit of 500 entities per write operation.
 	summaryUpdateBatchSize = 500
+	summaryDeleteBatchSize = 500
 )
 
 func getSummaryLastFullDay(c context.Context) (time.Time, error) {
@@ -210,6 +211,39 @@ func GenerateSummaries(c context.Context, now time.Time, fullDayDelay time.Durat
 		}
 
 		dayStart = dayStart.AddDate(0, 0, 1)
+	}
+	return nil
+}
+
+// DeleteSummarizedSamples deletes samples from days that have been "fully"
+// summarized (see GenerateSummaries). Samples from partially-summarized days
+// are never deleted. loc is used to determine day boundaries. daysToKeep
+// defines the number of fully-summarized days for which samples should be
+// retained.
+func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep int) error {
+	lastFullDay, err := getSummaryLastFullDay(c)
+	if err != nil {
+		return err
+	} else if lastFullDay.IsZero() {
+		return nil
+	}
+	keepDay := lastFullDay.In(loc).AddDate(0, 0, 1-daysToKeep)
+
+	log.Debugf(c, "Deleting all samples earlier than %4d-%02d-%02d",
+		keepDay.Year(), keepDay.Month(), keepDay.Day())
+	q := datastore.NewQuery(sampleKind).KeysOnly().
+		Filter("Timestamp <", keepDay).Limit(summaryDeleteBatchSize)
+	for {
+		var keys []*datastore.Key
+		if keys, err = q.GetAll(c, nil); err != nil {
+			return err
+		} else if len(keys) == 0 {
+			break
+		}
+		log.Debugf(c, "Deleting %v sample(s)", len(keys))
+		if err = datastore.DeleteMulti(c, keys); err != nil {
+			return err
+		}
 	}
 	return nil
 }

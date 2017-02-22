@@ -59,6 +59,7 @@ func init() {
 		panic(err)
 	}
 
+	http.HandleFunc("/purge", handlePurge)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/report", handleReport)
 	http.HandleFunc("/summarize", handleSummarize)
@@ -87,6 +88,16 @@ func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
 	}
 
 	return false
+}
+
+func handlePurge(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if err := storage.DeleteSummarizedSamples(c, location, cfg.DaysToKeep); err != nil {
+		log.Errorf(c, "Purging samples failed: %v", err)
+		http.Error(w, "Purging samples failed", http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, "purging done\n")
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
