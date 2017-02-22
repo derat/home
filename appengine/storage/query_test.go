@@ -163,8 +163,7 @@ func TestMergeQueryData(t *testing.T) {
 }
 
 func TestRunQuery(t *testing.T) {
-	c, done, loc := initTest()
-	defer done()
+	c := initTest()
 
 	t1 := time.Unix(1, 0).UTC()
 	t2 := time.Unix(2, 0).UTC()
@@ -196,7 +195,8 @@ func TestRunQuery(t *testing.T) {
 
 	// The start time's location should be used to determine the output's time zone.
 	checkQuery(t, c,
-		QueryParams{[]string{"B", "C"}, []string{"a|b", "a|c"}, t2.In(loc), t4.In(loc), IndividualSample},
+		QueryParams{[]string{"B", "C"}, []string{"a|b", "a|c"},
+			t2.In(testLoc), t4.In(testLoc), IndividualSample},
 		[]datarow{
 			{"Date(1969,11,31,16,0,2)", []float64{0.5, 0.75}},
 			{"Date(1969,11,31,16,0,3)", []float64{1.0}},
@@ -205,12 +205,7 @@ func TestRunQuery(t *testing.T) {
 }
 
 func TestRunQuerySummary(t *testing.T) {
-	c, done, loc := initTest()
-	defer done()
-
-	lt := func(year, month, day, hour, min, sec int) time.Time {
-		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
-	}
+	c := initTest()
 
 	if err := WriteSamples(c, []common.Sample{
 		common.Sample{lt(2015, 7, 1, 0, 0, 0), "a", "b", 1.0},

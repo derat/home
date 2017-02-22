@@ -11,8 +11,7 @@ import (
 )
 
 func TestWriteSamples(t *testing.T) {
-	c, done, _ := initTest()
-	defer done()
+	c := initTest()
 
 	const (
 		t1 = 123

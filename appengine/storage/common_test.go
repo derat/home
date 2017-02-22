@@ -4,6 +4,7 @@
 package storage
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -14,20 +15,34 @@ import (
 	"google.golang.org/appengine/datastore"
 )
 
-func initTest() (c context.Context, done func(), loc *time.Location) {
-	loc, err := time.LoadLocation("America/Los_Angeles")
+var testLoc *time.Location
+var testInst aetest.Instance
+
+func initTest() context.Context {
+	req, err := testInst.NewRequest("GET", "/", nil)
 	if err != nil {
 		panic(err)
 	}
-	inst, err := aetest.NewInstance(&aetest.Options{StronglyConsistentDatastore: true})
+	c := appengine.NewContext(req)
+
+	// Clear the datastore.
+	keys, err := datastore.NewQuery("").KeysOnly().GetAll(c, nil)
 	if err != nil {
 		panic(err)
 	}
-	req, err := inst.NewRequest("GET", "/", nil)
-	if err != nil {
+	if err = datastore.DeleteMulti(c, keys); err != nil {
 		panic(err)
 	}
-	return appengine.NewContext(req), func() { inst.Close() }, loc
+
+	return c
+}
+
+func lt(year, month, day, hour, min, sec int) time.Time {
+	return time.Date(year, time.Month(month), day, hour, min, sec, 0, testLoc)
+}
+
+func ld(year, month, day int) time.Time {
+	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, testLoc)
 }
 
 func checkSamples(t *testing.T, c context.Context, expected []common.Sample) {
@@ -41,4 +56,19 @@ func checkSamples(t *testing.T, c context.Context, expected []common.Sample) {
 	if as != es {
 		t.Errorf("Don't have expected samples:\nexpected: %q\n  actual: %q", es, as)
 	}
+}
+
+func TestMain(m *testing.M) {
+	var err error
+	testLoc, err = time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		panic(err)
+	}
+	testInst, err = aetest.NewInstance(&aetest.Options{StronglyConsistentDatastore: true})
+	if err != nil {
+		panic(err)
+	}
+	defer func() { testInst.Close() }()
+
+	os.Exit(m.Run())
 }

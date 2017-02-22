@@ -37,12 +37,8 @@ func checkSummaries(t *testing.T, c context.Context, kind string, es []summary) 
 }
 
 func TestGenerateSummaries(t *testing.T) {
-	c, done, loc := initTest()
-	defer done()
+	c := initTest()
 
-	lt := func(year, month, day, hour, min, sec int) time.Time {
-		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
-	}
 	const twoh = time.Duration(2) * time.Hour
 
 	if err := WriteSamples(c, []common.Sample{
@@ -96,32 +92,27 @@ func TestGenerateSummaries(t *testing.T) {
 		summary{lt(2017, 1, 3, 0, 0, 0), "s0", "n1", 0, 5.0, 5.0, 5.0},
 	})
 	checkSummaries(t, c, daySummaryKind, []summary{
-		summary{lt(2016, 3, 13, 0, 0, 0), "s0", "n0", 0, 1.0, 7.0, 4.0},
-		summary{lt(2016, 3, 14, 0, 0, 0), "s0", "n0", 0, 9.0, 9.0, 9.0},
-		summary{lt(2016, 11, 6, 0, 0, 0), "s0", "n0", 0, 1.0, 11.0, 6.0},
-		summary{lt(2016, 11, 7, 0, 0, 0), "s0", "n0", 0, 13.0, 13.0, 13.0},
-		summary{lt(2017, 1, 1, 0, 0, 0), "s0", "n0", 0, 1.0, 15.0, 5.8},
-		summary{lt(2017, 1, 1, 0, 0, 0), "s0", "n1", 0, 3.0, 3.0, 3.0},
-		summary{lt(2017, 1, 1, 0, 0, 0), "s1", "n0", 0, 1.2, 1.2, 1.2},
-		summary{lt(2017, 1, 2, 0, 0, 0), "s0", "n1", 0, 8.0, 8.0, 8.0},
-		summary{lt(2017, 1, 3, 0, 0, 0), "s0", "n1", 0, 5.0, 5.0, 5.0},
+		summary{ld(2016, 3, 13), "s0", "n0", 0, 1.0, 7.0, 4.0},
+		summary{ld(2016, 3, 14), "s0", "n0", 0, 9.0, 9.0, 9.0},
+		summary{ld(2016, 11, 6), "s0", "n0", 0, 1.0, 11.0, 6.0},
+		summary{ld(2016, 11, 7), "s0", "n0", 0, 13.0, 13.0, 13.0},
+		summary{ld(2017, 1, 1), "s0", "n0", 0, 1.0, 15.0, 5.8},
+		summary{ld(2017, 1, 1), "s0", "n1", 0, 3.0, 3.0, 3.0},
+		summary{ld(2017, 1, 1), "s1", "n0", 0, 1.2, 1.2, 1.2},
+		summary{ld(2017, 1, 2), "s0", "n1", 0, 8.0, 8.0, 8.0},
+		summary{ld(2017, 1, 3), "s0", "n1", 0, 5.0, 5.0, 5.0},
 	})
 }
 
 func TestGenerateSummariesSaveProgress(t *testing.T) {
-	c, done, loc := initTest()
-	defer done()
-
-	lt := func(year, month, day, hour, min, sec int) time.Time {
-		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
-	}
+	c := initTest()
 
 	// Generate summaries at 01:00 on the 3rd. Since we say that we want to wait
 	// two hours before considering a day complete, only the 1st should be
 	// marked as complete.
-	d1 := lt(2017, 1, 1, 0, 0, 0)
-	d2 := lt(2017, 1, 2, 0, 0, 0)
-	d3 := lt(2017, 1, 3, 0, 0, 0)
+	d1 := ld(2017, 1, 1)
+	d2 := ld(2017, 1, 2)
+	d3 := ld(2017, 1, 3)
 	if err := WriteSamples(c, []common.Sample{
 		common.Sample{d1, "s", "n", 1.0},
 		common.Sample{d2, "s", "n", 2.0},
@@ -133,9 +124,9 @@ func TestGenerateSummariesSaveProgress(t *testing.T) {
 		t.Fatalf("Failed to generate summaries: %v", err)
 	}
 	sums := []summary{
-		summary{lt(2017, 1, 1, 0, 0, 0), "s", "n", 0, 1.0, 1.0, 1.0},
-		summary{lt(2017, 1, 2, 0, 0, 0), "s", "n", 0, 2.0, 2.0, 2.0},
-		summary{lt(2017, 1, 3, 0, 0, 0), "s", "n", 0, 3.0, 3.0, 3.0},
+		summary{d1, "s", "n", 0, 1.0, 1.0, 1.0},
+		summary{d2, "s", "n", 0, 2.0, 2.0, 2.0},
+		summary{d3, "s", "n", 0, 3.0, 3.0, 3.0},
 	}
 	checkSummaries(t, c, daySummaryKind, sums)
 	checkSummaries(t, c, hourSummaryKind, sums)
@@ -151,7 +142,7 @@ func TestGenerateSummariesSaveProgress(t *testing.T) {
 	if err := GenerateSummaries(c, d3.Add(time.Hour), time.Duration(2)*time.Hour); err != nil {
 		t.Fatalf("Failed to generate summaries: %v", err)
 	}
-	sums[1] = summary{lt(2017, 1, 2, 0, 0, 0), "s", "n", 0, 2.0, 5.0, 3.5}
+	sums[1] = summary{d2, "s", "n", 0, 2.0, 5.0, 3.5}
 	checkSummaries(t, c, daySummaryKind, sums)
 	checkSummaries(t, c, hourSummaryKind, sums)
 
@@ -165,7 +156,7 @@ func TestGenerateSummariesSaveProgress(t *testing.T) {
 	if err := GenerateSummaries(c, d3.Add(time.Duration(3)*time.Hour), time.Duration(2)*time.Hour); err != nil {
 		t.Fatalf("Failed to generate summaries: %v", err)
 	}
-	sums[1] = summary{lt(2017, 1, 2, 0, 0, 0), "s", "n", 0, 2.0, 8.0, 5.0}
+	sums[1] = summary{d2, "s", "n", 0, 2.0, 8.0, 5.0}
 	checkSummaries(t, c, daySummaryKind, sums)
 	checkSummaries(t, c, hourSummaryKind, sums)
 
@@ -183,12 +174,7 @@ func TestGenerateSummariesSaveProgress(t *testing.T) {
 }
 
 func TestDeleteSummarizedSamples(t *testing.T) {
-	c, done, loc := initTest()
-	defer done()
-
-	lt := func(year, month, day, hour, min, sec int) time.Time {
-		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
-	}
+	c := initTest()
 
 	s10 := common.Sample{lt(2017, 1, 1, 0, 0, 0), "s", "n", 1.0}
 	s11 := common.Sample{lt(2017, 1, 1, 23, 59, 59), "s", "n", 1.0}
@@ -212,19 +198,19 @@ func TestDeleteSummarizedSamples(t *testing.T) {
 
 	// Request keeping the last two fully-summarized days. Only the 1st should
 	// be deleted.
-	if err := DeleteSummarizedSamples(c, loc, 2); err != nil {
+	if err := DeleteSummarizedSamples(c, testLoc, 2); err != nil {
 		t.Fatalf("Failed to delete summarized samples: %v", err)
 	}
 	checkSamples(t, c, []common.Sample{s20, s21, s30, s31, s40, s41})
 
 	// Now only keep one day and check that the 2nd is also deleted.
-	if err := DeleteSummarizedSamples(c, loc, 1); err != nil {
+	if err := DeleteSummarizedSamples(c, testLoc, 1); err != nil {
 		t.Fatalf("Failed to delete summarized samples: %v", err)
 	}
 	checkSamples(t, c, []common.Sample{s30, s31, s40, s41})
 
 	// Keeping zero days should also delete the 3rd.
-	if err := DeleteSummarizedSamples(c, loc, 0); err != nil {
+	if err := DeleteSummarizedSamples(c, testLoc, 0); err != nil {
 		t.Fatalf("Failed to delete summarized samples: %v", err)
 	}
 	checkSamples(t, c, []common.Sample{s40, s41})
