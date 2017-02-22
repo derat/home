@@ -1,4 +1,4 @@
 cron:
-- description: compact data
-  url: /compact
+- description: summarize data
+  url: /summarize
   schedule: every 1 hours

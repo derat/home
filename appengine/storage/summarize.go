@@ -19,6 +19,15 @@ const (
 	summaryUpdateBatchSize = 500
 )
 
+func getSummaryLastFullDay(c context.Context) (time.Time, error) {
+	s := summaryState{}
+	k := datastore.NewKey(c, summaryStateKind, "", summaryStateId, nil)
+	if err := datastore.Get(c, k, &s); err != nil && err != datastore.ErrNoSuchEntity {
+		return time.Time{}, err
+	}
+	return s.LastFullDay, nil
+}
+
 func updateSummary(sums map[string]*summary, sam *common.Sample, ts time.Time) {
 	sn := fmt.Sprintf("%s|%s", sam.Source, sam.Name)
 	if sum, ok := sums[sn]; ok {
@@ -140,16 +149,49 @@ func summarizeDay(c context.Context, loc *time.Location, queryStart time.Time) (
 		updateSummary(hourSums[hourStart], &s, hourStart)
 	}
 
+	if numSamples == 0 {
+		return time.Time{}, nil
+	}
+
 	log.Debugf(c, "Processed %v samples in %v ms",
 		numSamples, getMsecSinceTime(startTime))
 	return dayStart, writeSummaries(c, daySums, hourSums)
 }
 
-func GenerateSummaries(c context.Context, loc *time.Location) error {
-	var err error
+// GenerateSummaries reads samples and inserts daily and hourly summary
+// entities. now.Location() is used to define day boundaries; hour boundaries
+// are computed based on UTC. fullDayDelay defines how long we wait after the
+// end of a day before assuming that we have all the data we're going to get
+// from it (and not re-summarizing it in the future).
+func GenerateSummaries(c context.Context, now time.Time, fullDayDelay time.Duration) error {
+	ct := now.Add(time.Duration(-1) * fullDayDelay)
+	partialDay := time.Date(ct.Year(), ct.Month(), ct.Day(), 0, 0, 0, 0, ct.Location())
+
+	// This could all be much simpler if it were possible to do a single query
+	// to get all samples, iterate through them in-order, and insert summaries
+	// in parallel while we go. However, App Engine appears to impose a
+	// five-second deadline on datastore RPCs, which is pretty easy to hit when
+	// summarizing multiple days' worth of samples. It's possible to get around
+	// this by grabbing a cursor and issuing a new query when near the deadline,
+	// but that leads to the second problem: datastore writes are extremely
+	// prone to failure, and become even more so when doing multiple writes in
+	// parallel.
+	//
+	// To mostly sidestep all of this garbage, issue a separate query for each
+	// day, insert summaries using sequential operations after reading the whole
+	// day, and mark the day as complete after summarizing it. This makes it
+	// more likely that we'll make forward progress when summarizing multiple
+	// days even if/when we hit a write error midway through.
 	dayStart := time.Time{}
+	if lfd, err := getSummaryLastFullDay(c); err != nil {
+		return err
+	} else if !lfd.IsZero() {
+		dayStart = lfd.In(now.Location()).AddDate(0, 0, 1)
+	}
+
 	for {
-		dayStart, err = summarizeDay(c, loc, dayStart)
+		var err error
+		dayStart, err = summarizeDay(c, now.Location(), dayStart)
 		if err != nil {
 			return err
 		} else if dayStart.IsZero() {
@@ -157,6 +199,14 @@ func GenerateSummaries(c context.Context, loc *time.Location) error {
 		}
 		log.Debugf(c, "Finished summarizing %4d-%02d-%02d",
 			dayStart.Year(), dayStart.Month(), dayStart.Day())
+
+		if dayStart.Before(partialDay) {
+			k := datastore.NewKey(c, summaryStateKind, "", summaryStateId, nil)
+			if _, err := datastore.Put(c, k, &summaryState{dayStart}); err != nil {
+				return err
+			}
+		}
+
 		dayStart = dayStart.AddDate(0, 0, 1)
 	}
 	return nil

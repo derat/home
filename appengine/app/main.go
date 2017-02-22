@@ -59,9 +59,9 @@ func init() {
 		panic(err)
 	}
 
-	http.HandleFunc("/compact", handleCompact)
 	http.HandleFunc("/query", handleQuery)
 	http.HandleFunc("/report", handleReport)
+	http.HandleFunc("/summarize", handleSummarize)
 	http.HandleFunc("/", handleIndex)
 }
 
@@ -87,16 +87,6 @@ func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
 	}
 
 	return false
-}
-
-func handleCompact(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if err := storage.GenerateSummaries(c, location); err != nil {
-		log.Errorf(c, "Generating summaries failed: %v", err)
-		http.Error(w, "Generating summaries failed", http.StatusInternalServerError)
-		return
-	}
-	io.WriteString(w, "compaction done\n")
 }
 
 func handleQuery(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +172,17 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	io.WriteString(w, "got it\n")
+}
+
+func handleSummarize(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	if err := storage.GenerateSummaries(c, time.Now().In(location),
+		time.Duration(cfg.FullDayDelaySeconds)*time.Second); err != nil {
+		log.Errorf(c, "Generating summaries failed: %v", err)
+		http.Error(w, "Generating summaries failed", http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, "summarizing done\n")
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {

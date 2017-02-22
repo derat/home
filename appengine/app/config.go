@@ -14,11 +14,10 @@ const (
 	// Hardcoded secret used when running dev app server.
 	devSecret = "secret"
 
-	// Default duration to display in graphs.
-	defaultGraphSec = 7200
-
-	// Default reporting interval.
-	defaultReportSec = 300
+	// Default values used in configs.
+	defaultGraphSec        = 7200
+	defaultReportSec       = 300
+	defaultFullDayDelaySec = 24 * 3600
 )
 
 // graphLineConfig describes a line within a graph.
@@ -72,6 +71,11 @@ type config struct {
 	// Page title.
 	Title string
 
+	// Number of seconds to wait after the end of a day before assuming that we
+	// won't get any new samples for it (and don't need to continue
+	// re-summarizing it).
+	FullDayDelaySeconds int
+
 	// Graphs to display on page.
 	Graphs []graphConfig
 }
@@ -87,6 +91,9 @@ func loadConfig(path string) (*config, *time.Location, error) {
 	}
 	if c.TimeZone == "" {
 		c.TimeZone = "America/Los_Angeles"
+	}
+	if c.FullDayDelaySeconds <= 0 {
+		c.FullDayDelaySeconds = defaultFullDayDelaySec
 	}
 	for i := range c.Graphs {
 		if c.Graphs[i].Seconds <= 0 {

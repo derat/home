@@ -164,7 +164,7 @@ func TestMergeQueryData(t *testing.T) {
 }
 
 func TestRunQuery(t *testing.T) {
-	c, done := test.InitTest()
+	c, done, loc := test.InitTest()
 	defer done()
 
 	t1 := time.Unix(1, 0).UTC()
@@ -196,10 +196,6 @@ func TestRunQuery(t *testing.T) {
 		})
 
 	// The start time's location should be used to determine the output's time zone.
-	loc, err := time.LoadLocation("America/Los_Angeles")
-	if err != nil {
-		t.Fatalf("Failed to load location: %v", err)
-	}
 	checkQuery(t, c,
 		QueryParams{[]string{"B", "C"}, []string{"a|b", "a|c"}, t2.In(loc), t4.In(loc), IndividualSample},
 		[]datarow{
@@ -210,13 +206,8 @@ func TestRunQuery(t *testing.T) {
 }
 
 func TestRunQuerySummary(t *testing.T) {
-	c, done := test.InitTest()
+	c, done, loc := test.InitTest()
 	defer done()
-
-	loc, err := time.LoadLocation("America/Los_Angeles")
-	if err != nil {
-		t.Fatalf("Failed to load location: %v", err)
-	}
 
 	lt := func(year, month, day, hour, min, sec int) time.Time {
 		return time.Date(year, time.Month(month), day, hour, min, sec, 0, loc)
@@ -232,7 +223,7 @@ func TestRunQuerySummary(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Failed inserting samples: %v", err)
 	}
-	if err := GenerateSummaries(c, loc); err != nil {
+	if err := GenerateSummaries(c, lt(2015, 7, 4, 0, 0, 0), time.Hour); err != nil {
 		t.Fatalf("Failed to generate summaries: %v", err)
 	}
 

@@ -14,6 +14,9 @@ const (
 	// Datastore kinds for summary entities.
 	hourSummaryKind = "HourSummary"
 	daySummaryKind  = "DaySummary"
+
+	summaryStateKind = "SummaryState"
+	summaryStateId   = 1
 )
 
 type summary struct {
@@ -24,4 +27,8 @@ type summary struct {
 	MinValue  float32 `datastore:",noindex"`
 	MaxValue  float32 `datastore:",noindex"`
 	AvgValue  float32 `datastore:",noindex"`
+}
+
+type summaryState struct {
+	LastFullDay time.Time
 }
