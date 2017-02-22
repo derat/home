@@ -70,7 +70,7 @@ func runPowerLoop(cfg *config, r *reporter) {
 			if stats.OnLine {
 				onLineVal = 1.0
 			}
-			r.reportSamples([]*common.Sample{
+			r.reportSamples([]common.Sample{
 				{start, cfg.Source, samplePowerOnLine, onLineVal},
 				{start, cfg.Source, samplePowerLineVoltage, stats.LineVoltage},
 				{start, cfg.Source, samplePowerLoadPercent, stats.LoadPercent},

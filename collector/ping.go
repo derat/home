@@ -99,7 +99,7 @@ func runPingLoop(cfg *config, r *reporter) {
 		if stats.commandFailed {
 			failedVal = 1.0
 		}
-		r.reportSamples([]*common.Sample{
+		r.reportSamples([]common.Sample{
 			{start, cfg.Source, samplePingFailed, failedVal},
 			{start, cfg.Source, samplePingMin, stats.minReplyMs},
 			{start, cfg.Source, samplePingAvg, stats.avgReplyMs},

@@ -25,10 +25,10 @@ type reporter struct {
 	client *http.Client
 
 	// Samples that have not yet been sent to the server.
-	queuedSamples []*common.Sample
+	queuedSamples []common.Sample
 
 	// Samples that are listed in the backing file.
-	backingFileSamples []*common.Sample
+	backingFileSamples []common.Sample
 
 	// Used to signal the reporter goroutine when samples is non-empty.
 	// Protects samples and stopping.
@@ -48,8 +48,8 @@ func newReporter(cfg *config) *reporter {
 	r := &reporter{
 		cfg:                cfg,
 		client:             &http.Client{Timeout: time.Duration(cfg.ReportTimeoutMs) * time.Millisecond},
-		queuedSamples:      make([]*common.Sample, 0),
-		backingFileSamples: make([]*common.Sample, 0),
+		queuedSamples:      make([]common.Sample, 0),
+		backingFileSamples: make([]common.Sample, 0),
 		cond:               sync.NewCond(new(sync.Mutex)),
 		retryTimeout:       make(chan bool, 2),
 	}
@@ -81,11 +81,11 @@ func (r *reporter) stop() {
 	r.wg.Wait()
 }
 
-func (r *reporter) reportSample(s *common.Sample) {
-	r.reportSamples([]*common.Sample{s})
+func (r *reporter) reportSample(s common.Sample) {
+	r.reportSamples([]common.Sample{s})
 }
 
-func (r *reporter) reportSamples(samples []*common.Sample) {
+func (r *reporter) reportSamples(samples []common.Sample) {
 	for _, s := range samples {
 		r.cfg.Logger.Printf("Queuing %v", s.String())
 	}
@@ -114,7 +114,7 @@ func (r *reporter) processSamples() {
 			return
 		}
 		samples := r.queuedSamples
-		r.queuedSamples = make([]*common.Sample, 0)
+		r.queuedSamples = make([]common.Sample, 0)
 		r.cond.L.Unlock()
 
 		r.cfg.Logger.Printf("Took %v sample(s) from queue", len(samples))
@@ -139,7 +139,7 @@ func (r *reporter) processSamples() {
 			r.cfg.Logger.Printf("Returning %v unreported sample(s) to queue", len(samples))
 			r.queuedSamples = append(samples, r.queuedSamples...)
 		}
-		var newBackingFileSamples []*common.Sample
+		var newBackingFileSamples []common.Sample
 		if !reflect.DeepEqual(r.backingFileSamples, r.queuedSamples) {
 			newBackingFileSamples = r.queuedSamples
 		}
@@ -167,7 +167,7 @@ func (r *reporter) processSamples() {
 
 }
 
-func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
+func (r *reporter) sendSamplesToServer(samples []common.Sample) error {
 	data := common.JoinSamples(samples)
 	sig := common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, r.cfg.ReportSecret))
 	resp, err := r.client.PostForm(r.cfg.ReportURL, url.Values{"d": {data}, "s": {sig}})
@@ -179,14 +179,14 @@ func (r *reporter) sendSamplesToServer(samples []*common.Sample) error {
 	return nil
 }
 
-func (r *reporter) readSamplesFromBackingFile() ([]*common.Sample, error) {
+func (r *reporter) readSamplesFromBackingFile() ([]common.Sample, error) {
 	f, err := os.Open(r.cfg.BackingFile)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	samples := make([]*common.Sample, 0)
+	samples := make([]common.Sample, 0)
 	d := json.NewDecoder(f)
 	for {
 		var s common.Sample
@@ -195,13 +195,13 @@ func (r *reporter) readSamplesFromBackingFile() ([]*common.Sample, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		samples = append(samples, &s)
+		samples = append(samples, s)
 	}
 
 	return samples, nil
 }
 
-func (r *reporter) writeSamplesToBackingFile(samples []*common.Sample) error {
+func (r *reporter) writeSamplesToBackingFile(samples []common.Sample) error {
 	if r.cfg.BackingFile == "" {
 		return nil
 	}

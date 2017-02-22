@@ -38,12 +38,12 @@ func TestWriteSamples(t *testing.T) {
 	}
 
 	q := datastore.NewQuery(sampleKind).Order("Timestamp").Order("Source").Order("Name")
-	actual := make([]*common.Sample, 0)
+	actual := make([]common.Sample, 0)
 	if _, err := q.GetAll(c, &actual); err != nil {
 		t.Fatalf("failed to read samples: %v", err)
 	}
 	as := common.JoinSamples(actual)
-	es := common.JoinSamples([]*common.Sample{&s0update, &s1, &s2, &s3})
+	es := common.JoinSamples([]common.Sample{s0update, s1, s2, s3})
 	if as != es {
 		t.Errorf("expected %q, got %q", es, as)
 	}

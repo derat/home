@@ -30,15 +30,13 @@ func (l *listener) handleReport(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	lines := strings.Split(r.PostFormValue("d"), "\n")
-	samples := make([]*common.Sample, len(lines))
+	samples := make([]common.Sample, len(lines))
 	for i, line := range lines {
-		s := common.Sample{}
-		if err := s.Parse(line, now); err != nil {
+		if err := samples[i].Parse(line, now); err != nil {
 			l.cfg.Logger.Printf("Report has unparseable sample %q: %v", line, err)
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
-		samples[i] = &s
 	}
 
 	if len(samples) == 0 {

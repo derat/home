@@ -133,16 +133,16 @@ func TestReport(t *testing.T) {
 	ts, r := initTest(t, createConfig())
 	defer cleanUpTest(ts, r)
 
-	s := &common.Sample{time.Unix(123, 0), "SOURCE", "NAME", 10.0}
+	s := common.Sample{time.Unix(123, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s)
 	str := ts.waitForReport(t)
 	if str != s.String() {
 		t.Errorf("Expected %q to be reported; saw %q", s.String(), str)
 	}
 
-	samples := []*common.Sample{
-		&common.Sample{time.Unix(123, 0), "INSIDE", "HUMIDITY", 35.5},
-		&common.Sample{time.Unix(456, 0), "OUTSIDE", "TEMP", 65.0},
+	samples := []common.Sample{
+		common.Sample{time.Unix(123, 0), "INSIDE", "HUMIDITY", 35.5},
+		common.Sample{time.Unix(456, 0), "OUTSIDE", "TEMP", 65.0},
 	}
 	r.reportSamples(samples)
 	str = ts.waitForReport(t)
@@ -157,9 +157,9 @@ func TestBatching(t *testing.T) {
 	ts, r := initTest(t, cfg)
 	defer cleanUpTest(ts, r)
 
-	samples := make([]*common.Sample, cfg.ReportBatchSize*3+1)
+	samples := make([]common.Sample, cfg.ReportBatchSize*3+1)
 	for i := range samples {
-		samples[i] = &common.Sample{time.Unix(int64(i), 0), "SOURCE", "NAME", 10.0}
+		samples[i] = common.Sample{time.Unix(int64(i), 0), "SOURCE", "NAME", 10.0}
 	}
 
 	r.reportSamples(samples)
@@ -180,16 +180,16 @@ func TestRetry(t *testing.T) {
 	defer cleanUpTest(ts, r)
 
 	ts.responseCode = http.StatusInternalServerError
-	s0 := &common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
+	s0 := common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s0)
 	ts.waitForReport(t)
 
 	ts.responseCode = http.StatusOK
-	s1 := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
+	s1 := common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s1)
 	r.triggerRetryTimeout()
 	str := ts.waitForReport(t)
-	exp := common.JoinSamples([]*common.Sample{s0, s1})
+	exp := common.JoinSamples([]common.Sample{s0, s1})
 	if str != exp {
 		t.Errorf("Expected %q on retry; saw %q", exp, str)
 	}
@@ -202,7 +202,7 @@ func TestTimeout(t *testing.T) {
 	defer cleanUpTest(ts, r)
 	ts.responseDelay = time.Duration(cfg.ReportTimeoutMs+50) * time.Millisecond
 
-	s := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
+	s := common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s)
 	ts.waitForReport(t)
 
@@ -222,7 +222,7 @@ func TestBackingFile(t *testing.T) {
 	defer ts.stop()
 
 	ts.responseCode = http.StatusInternalServerError
-	s0 := &common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
+	s0 := common.Sample{time.Unix(0, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s0)
 	ts.waitForReport(t)
 	r.triggerRetryTimeout()
@@ -243,18 +243,18 @@ func TestBackingFile(t *testing.T) {
 
 	// Add a second sample and check that the two are reported in-order next
 	// time.
-	s1 := &common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
+	s1 := common.Sample{time.Unix(1, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s1)
 	r.triggerRetryTimeout()
 	str = ts.waitForReport(t)
-	exp := common.JoinSamples([]*common.Sample{s0, s1})
+	exp := common.JoinSamples([]common.Sample{s0, s1})
 	if str != exp {
 		t.Errorf("Expected %q on retry; saw %q", exp, str)
 	}
 
 	// Add a third sample and stop the reporter before it gets a chance to
 	// retry.
-	s2 := &common.Sample{time.Unix(2, 0), "SOURCE", "NAME", 10.0}
+	s2 := common.Sample{time.Unix(2, 0), "SOURCE", "NAME", 10.0}
 	r.reportSample(s2)
 	r.stop()
 
@@ -263,7 +263,7 @@ func TestBackingFile(t *testing.T) {
 	r = newReporter(cfg)
 	r.start()
 	str = ts.waitForReport(t)
-	exp = common.JoinSamples([]*common.Sample{s0, s1, s2})
+	exp = common.JoinSamples([]common.Sample{s0, s1, s2})
 	if str != exp {
 		t.Errorf("Expected %q on retry; saw %q", exp, str)
 	}
