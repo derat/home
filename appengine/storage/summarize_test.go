@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/home/appengine/test"
 	"erat.org/home/common"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
@@ -38,7 +37,7 @@ func checkSummaries(t *testing.T, c context.Context, kind string, es []summary) 
 }
 
 func TestGenerateSummaries(t *testing.T) {
-	c, done, loc := test.InitTest()
+	c, done, loc := initTest()
 	defer done()
 
 	lt := func(year, month, day, hour, min, sec int) time.Time {
@@ -110,7 +109,7 @@ func TestGenerateSummaries(t *testing.T) {
 }
 
 func TestGenerateSummariesSaveProgress(t *testing.T) {
-	c, done, loc := test.InitTest()
+	c, done, loc := initTest()
 	defer done()
 
 	lt := func(year, month, day, hour, min, sec int) time.Time {
@@ -184,7 +183,7 @@ func TestGenerateSummariesSaveProgress(t *testing.T) {
 }
 
 func TestDeleteSummarizedSamples(t *testing.T) {
-	c, done, loc := test.InitTest()
+	c, done, loc := initTest()
 	defer done()
 
 	lt := func(year, month, day, hour, min, sec int) time.Time {
@@ -216,17 +215,17 @@ func TestDeleteSummarizedSamples(t *testing.T) {
 	if err := DeleteSummarizedSamples(c, loc, 2); err != nil {
 		t.Fatalf("Failed to delete summarized samples: %v", err)
 	}
-	test.CheckSamples(t, c, sampleKind, []common.Sample{s20, s21, s30, s31, s40, s41})
+	checkSamples(t, c, []common.Sample{s20, s21, s30, s31, s40, s41})
 
 	// Now only keep one day and check that the 2nd is also deleted.
 	if err := DeleteSummarizedSamples(c, loc, 1); err != nil {
 		t.Fatalf("Failed to delete summarized samples: %v", err)
 	}
-	test.CheckSamples(t, c, sampleKind, []common.Sample{s30, s31, s40, s41})
+	checkSamples(t, c, []common.Sample{s30, s31, s40, s41})
 
 	// Keeping zero days should also delete the 3rd.
 	if err := DeleteSummarizedSamples(c, loc, 0); err != nil {
 		t.Fatalf("Failed to delete summarized samples: %v", err)
 	}
-	test.CheckSamples(t, c, sampleKind, []common.Sample{s40, s41})
+	checkSamples(t, c, []common.Sample{s40, s41})
 }

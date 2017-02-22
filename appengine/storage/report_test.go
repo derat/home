@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/home/appengine/test"
 	"erat.org/home/common"
 )
 
 func TestWriteSamples(t *testing.T) {
-	c, done, _ := test.InitTest()
+	c, done, _ := initTest()
 	defer done()
 
 	const (
@@ -35,5 +34,5 @@ func TestWriteSamples(t *testing.T) {
 	if err := WriteSamples(c, []common.Sample{s0update, s2, s3}); err != nil {
 		t.Errorf("failed to write samples: %v", err)
 	}
-	test.CheckSamples(t, c, sampleKind, []common.Sample{s0update, s1, s2, s3})
+	checkSamples(t, c, []common.Sample{s0update, s1, s2, s3})
 }

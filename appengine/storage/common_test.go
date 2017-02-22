@@ -1,7 +1,7 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-package test
+package storage
 
 import (
 	"testing"
@@ -14,7 +14,7 @@ import (
 	"google.golang.org/appengine/datastore"
 )
 
-func InitTest() (c context.Context, done func(), loc *time.Location) {
+func initTest() (c context.Context, done func(), loc *time.Location) {
 	loc, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
 		panic(err)
@@ -30,8 +30,8 @@ func InitTest() (c context.Context, done func(), loc *time.Location) {
 	return appengine.NewContext(req), func() { inst.Close() }, loc
 }
 
-func CheckSamples(t *testing.T, c context.Context, kind string, expected []common.Sample) {
-	q := datastore.NewQuery(kind).Order("Timestamp").Order("Source").Order("Name")
+func checkSamples(t *testing.T, c context.Context, expected []common.Sample) {
+	q := datastore.NewQuery(sampleKind).Order("Timestamp").Order("Source").Order("Name")
 	actual := make([]common.Sample, 0)
 	if _, err := q.GetAll(c, &actual); err != nil {
 		t.Fatalf("Failed to read samples: %v", err)
