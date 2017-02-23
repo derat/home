@@ -245,6 +245,13 @@ func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep i
 		if err = datastore.DeleteMulti(c, keys); err != nil {
 			return err
 		}
+		// If we didn't get a full set of keys, assume that this was the final
+		// delete. Otherwise, it looks like we can continue receiving query
+		// results for a while longer -- is this due to eventual consistency
+		// causing us to see already-deleted entities?
+		if len(keys) < summaryDeleteBatchSize {
+			break
+		}
 	}
 	return nil
 }
