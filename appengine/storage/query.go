@@ -25,6 +25,116 @@ type point struct {
 	err       error
 }
 
+// QueryGranularity describes the types of points used in query results.
+type QueryGranularity int
+
+const (
+	IndividualSample QueryGranularity = iota
+	HourlyAverage
+	DailyAverage
+)
+
+// QueryParams describes a query to be performed.
+type QueryParams struct {
+	// Labels contains human-readable labels for lines.
+	Labels []string
+
+	// SourceNames contains "source|name" pairs describing lines. It must be the
+	// same length, and be in the same order, as labels.
+	SourceNames []string
+
+	// Start and End describe the inclusive time range for the query.
+	Start time.Time
+	End   time.Time
+
+	// Granularity describes the types fo points to use.
+	Granularity QueryGranularity
+
+	// Aggregate describes how many sequential points to average together for
+	// each returned point. It has no effect if less than or equal to 1.
+	Aggregate int
+}
+
+// RunQuery runs the query described by qp synchronously and writes a Google
+// Chart API DataTable object to w.
+func RunQuery(c context.Context, w io.Writer, qp QueryParams) error {
+	if len(qp.Labels) != len(qp.SourceNames) {
+		return fmt.Errorf("Different numbers of labels and sourcenames")
+	}
+
+	kind := sampleKind
+	if qp.Granularity == HourlyAverage {
+		kind = hourSummaryKind
+	} else if qp.Granularity == DailyAverage {
+		kind = daySummaryKind
+	}
+
+	baseQuery := datastore.NewQuery(kind).Limit(maxQueryResults).Order("Timestamp")
+	baseQuery = baseQuery.Filter("Timestamp >=", qp.Start).Filter("Timestamp <=", qp.End)
+
+	chans := make([]chan point, len(qp.SourceNames))
+	for i, sn := range qp.SourceNames {
+		chans[i] = make(chan point)
+		parts := strings.Split(sn, "|")
+		if len(parts) != 2 {
+			return fmt.Errorf("Invalid 'source|name' string %q", sn)
+		}
+		q := baseQuery.Filter("Source =", parts[0]).Filter("Name =", parts[1])
+
+		go func(q *datastore.Query, ch chan point) {
+			var s interface{}
+			var mp func(s interface{}) point
+
+			if qp.Granularity == IndividualSample {
+				s = &common.Sample{}
+				mp = func(s interface{}) point {
+					return point{s.(*common.Sample).Timestamp, s.(*common.Sample).Value, nil}
+				}
+			} else {
+				s = &summary{}
+				mp = func(s interface{}) point {
+					return point{s.(*summary).Timestamp, s.(*summary).AvgValue, nil}
+				}
+			}
+
+			var points []point
+			if qp.Aggregate > 1 {
+				points = make([]point, 0, qp.Aggregate)
+			}
+
+			it := q.Run(c)
+			for {
+				if _, err := it.Next(s); err == datastore.Done {
+					if points != nil && len(points) > 0 {
+						ch <- averagePoints(points)
+					}
+					close(ch)
+					break
+				} else if err != nil {
+					ch <- point{time.Time{}, 0, err}
+					break
+				}
+
+				p := mp(s)
+				if points == nil {
+					ch <- p
+				} else {
+					points = append(points, p)
+					if len(points) == qp.Aggregate {
+						ch <- averagePoints(points)
+						points = points[:0]
+					}
+				}
+
+			}
+		}(q, chans[i])
+	}
+
+	out := make(chan timeData)
+	go mergeQueryData(chans, out)
+	return writeQueryOutput(w, qp.Labels, out, qp.Start.Location())
+}
+
 // averagePoints returns a point containing the midpoint time and average value
 // of points, which must be sorted by ascending time.
 func averagePoints(points []point) point {
@@ -46,15 +156,17 @@ func averagePoints(points []point) point {
 	}
 }
 
-// timeData contains values associated with a given timestamp.
-// If an input channel did not have a value, its entry in values
-// is NaN.
+// timeData contains values associated with a given timestamp. If a line did not
+// have a value at that time, its entry in values is NaN. Trailing NaN values
+// may be omitted.
 type timeData struct {
 	timestamp time.Time
 	values    []float32
 	err       error
 }
 
+// mergeQueryData reads points in ascending time from channels (one per
+// line) and writes per-timestamp sets of values to out.
 func mergeQueryData(in []chan point, out chan timeData) {
 	nan := float32(math.NaN())
 	next := make([]*point, len(in))
@@ -97,6 +209,12 @@ func mergeQueryData(in []chan point, out chan timeData) {
 	close(out)
 }
 
+// writeQueryOutput reads per-timestamp sets of values from ch and writes them
+// to w as a JSON object that can be used to construct a Google Chart API
+// DataTable object
+// (https://developers.google.com/chart/interactive/docs/reference#dataparam).
+// labels provides labels for each line, and loc provides the time zone that is
+// used when converting timeData's timestamps to symbolic times.
 func writeQueryOutput(w io.Writer, labels []string, ch chan timeData, loc *time.Location) error {
 	var err error
 	write := func(s string) {
@@ -155,99 +273,4 @@ func writeQueryOutput(w io.Writer, labels []string, ch chan timeData, loc *time.
 	}
 	write("]}")
 	return err
-}
-
-type QueryGranularity int
-
-const (
-	IndividualSample QueryGranularity = iota
-	HourlyAverage
-	DailyAverage
-)
-
-type QueryParams struct {
-	Labels           []string
-	SourceNames      []string
-	Start            time.Time
-	End              time.Time
-	Granularity      QueryGranularity
-	AggregationCount int
-}
-
-func RunQuery(c context.Context, w io.Writer, qp QueryParams) error {
-	if len(qp.Labels) != len(qp.SourceNames) {
-		return fmt.Errorf("Different numbers of labels and sourcenames")
-	}
-
-	kind := sampleKind
-	if qp.Granularity == HourlyAverage {
-		kind = hourSummaryKind
-	} else if qp.Granularity == DailyAverage {
-		kind = daySummaryKind
-	}
-
-	baseQuery := datastore.NewQuery(kind).Limit(maxQueryResults).Order("Timestamp")
-	baseQuery = baseQuery.Filter("Timestamp >=", qp.Start).Filter("Timestamp <=", qp.End)
-
-	chans := make([]chan point, len(qp.SourceNames))
-	for i, sn := range qp.SourceNames {
-		chans[i] = make(chan point)
-		parts := strings.Split(sn, "|")
-		if len(parts) != 2 {
-			return fmt.Errorf("Invalid 'source|name' string %q", sn)
-		}
-		q := baseQuery.Filter("Source =", parts[0]).Filter("Name =", parts[1])
-
-		go func(q *datastore.Query, ch chan point) {
-			var s interface{}
-			var mp func(s interface{}) point
-
-			if qp.Granularity == IndividualSample {
-				s = &common.Sample{}
-				mp = func(s interface{}) point {
-					return point{s.(*common.Sample).Timestamp, s.(*common.Sample).Value, nil}
-				}
-			} else {
-				s = &summary{}
-				mp = func(s interface{}) point {
-					return point{s.(*summary).Timestamp, s.(*summary).AvgValue, nil}
-				}
-			}
-
-			var points []point
-			if qp.AggregationCount > 1 {
-				points = make([]point, 0, qp.AggregationCount)
-			}
-
-			it := q.Run(c)
-			for {
-				if _, err := it.Next(s); err == datastore.Done {
-					if points != nil && len(points) > 0 {
-						ch <- averagePoints(points)
-					}
-					close(ch)
-					break
-				} else if err != nil {
-					ch <- point{time.Time{}, 0, err}
-					break
-				}
-
-				p := mp(s)
-				if points == nil {
-					ch <- p
-				} else {
-					points = append(points, p)
-					if len(points) == qp.AggregationCount {
-						ch <- averagePoints(points)
-						points = points[:0]
-					}
-				}
-
-			}
-		}(q, chans[i])
-	}
-
-	out := make(chan timeData)
-	go mergeQueryData(chans, out)
-	return writeQueryOutput(w, qp.Labels, out, qp.Start.Location())
 }
