@@ -117,6 +117,12 @@ func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep i
 	return nil
 }
 
+// getSummaryId returns the ID that should be used for storing s in the
+// datastore. This format cannot be changed.
+func getSummaryId(s *summary) string {
+	return fmt.Sprintf("%d|%s|%s", s.Timestamp.Unix(), s.Source, s.Name)
+}
+
 // getSummaryLastFullDay queries datastore for the last fully-summarized day. It
 // returns an empty time.Time if no day has been fully summarized.
 func getSummaryLastFullDay(c context.Context) (time.Time, error) {
@@ -132,10 +138,10 @@ func getSummaryLastFullDay(c context.Context) (time.Time, error) {
 // contains existing summaries keyed by "source|name". ts contains the beginning
 // of the summarized time range.
 func updateSummary(sums map[string]*summary, sam *common.Sample, ts time.Time) {
-	sn := fmt.Sprintf("%s|%s", sam.Source, sam.Name)
-	if sum, ok := sums[sn]; ok {
+	key := fmt.Sprintf("%s|%s", sam.Source, sam.Name)
+	if sum, ok := sums[key]; ok {
 		if sum.Timestamp != ts {
-			panic(fmt.Sprintf("summary for %v starts at %v instead of %v", sn, sum.Timestamp, ts))
+			panic(fmt.Sprintf("summary for %v starts at %v instead of %v", key, sum.Timestamp, ts))
 		}
 		sum.NumValues += 1
 		sum.MinValue = float32(math.Min(float64(sam.Value), float64(sum.MinValue)))
@@ -143,7 +149,7 @@ func updateSummary(sums map[string]*summary, sam *common.Sample, ts time.Time) {
 		sum.AvgValue = sum.AvgValue*((float32(sum.NumValues)-1)/float32(sum.NumValues)) +
 			sam.Value*(1/float32(sum.NumValues))
 	} else {
-		sums[sn] = &summary{
+		sums[key] = &summary{
 			Timestamp: ts,
 			Source:    sam.Source,
 			Name:      sam.Name,
@@ -175,8 +181,7 @@ func writeSummaries(c context.Context, ds map[string]*summary,
 	numSummaries := 0
 	add := func(kind string, s *summary) error {
 		numSummaries++
-		id := fmt.Sprintf("%d|%s|%s", s.Timestamp.Unix(), s.Source, s.Name)
-		keys = append(keys, datastore.NewKey(c, kind, id, 0, nil))
+		keys = append(keys, datastore.NewKey(c, kind, getSummaryId(s), 0, nil))
 		sums = append(sums, s)
 		if len(sums) == summaryUpdateBatchSize {
 			if err := writeAndClear(); err != nil {
