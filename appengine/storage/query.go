@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	maxQueryResults = 60 * 24
+	maxQueryDatastoreResults = 60 * 24
+	maxQueryPoints           = 100
 )
 
 type point struct {
@@ -25,7 +26,7 @@ type point struct {
 	err       error
 }
 
-// QueryGranularity describes the types of points used in query results.
+// QueryGranularity describes types of points used in query results.
 type QueryGranularity int
 
 const (
@@ -47,7 +48,7 @@ type QueryParams struct {
 	Start time.Time
 	End   time.Time
 
-	// Granularity describes the types fo points to use.
+	// Granularity describes the type of points to use.
 	Granularity QueryGranularity
 
 	// Aggregate describes how many sequential points to average together for
@@ -55,9 +56,40 @@ type QueryParams struct {
 	Aggregate int
 }
 
-// RunQuery runs the query described by qp synchronously and writes a Google
+// UpdateGranularityAndAggregate updates the Granularity and Aggregate fields
+// based on Start, End, and sampleInterval, the typical interval between
+// samples.
+func (qp *QueryParams) UpdateGranularityAndAggregate(sampleInterval time.Duration) {
+	queryDuration := qp.End.Sub(qp.Start)
+	day := 24 * time.Hour
+	dayCount := int(queryDuration / day)
+	hourCount := int(queryDuration / time.Hour)
+	sampleCount := int(queryDuration / sampleInterval)
+	samplesPerHour := int(time.Hour / sampleInterval)
+	hoursPerDay := int(day / time.Hour)
+
+	qp.Aggregate = 1
+	if hourCount/hoursPerDay*2 > maxQueryPoints {
+		qp.Granularity = DailyAverage
+		if dayCount > maxQueryPoints {
+			qp.Aggregate = dayCount / maxQueryPoints
+		}
+	} else if sampleCount/samplesPerHour*2 > maxQueryPoints {
+		qp.Granularity = HourlyAverage
+		if hourCount > maxQueryPoints {
+			qp.Aggregate = hourCount / maxQueryPoints
+		}
+	} else {
+		qp.Granularity = IndividualSample
+		if sampleCount > maxQueryPoints {
+			qp.Aggregate = sampleCount / maxQueryPoints
+		}
+	}
+}
+
+// runQuery runs the query described by qp synchronously and writes a Google
 // Chart API DataTable object to w.
-func RunQuery(c context.Context, w io.Writer, qp QueryParams) error {
+func DoQuery(c context.Context, w io.Writer, qp QueryParams) error {
 	if len(qp.Labels) != len(qp.SourceNames) {
 		return fmt.Errorf("Different numbers of labels and sourcenames")
 	}
@@ -69,7 +101,7 @@ func RunQuery(c context.Context, w io.Writer, qp QueryParams) error {
 		kind = daySummaryKind
 	}
 
-	baseQuery := datastore.NewQuery(kind).Limit(maxQueryResults).Order("Timestamp")
+	baseQuery := datastore.NewQuery(kind).Limit(maxQueryDatastoreResults).Order("Timestamp")
 	baseQuery = baseQuery.Filter("Timestamp >=", qp.Start).Filter("Timestamp <=", qp.End)
 
 	chans := make([]chan point, len(qp.SourceNames))

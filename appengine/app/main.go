@@ -111,14 +111,6 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	p.Labels = strings.Split(r.FormValue("labels"), ",")
 	p.SourceNames = strings.Split(r.FormValue("names"), ",")
 
-	if r.FormValue("summary") == "day" {
-		p.Granularity = storage.DailyAverage
-	} else if r.FormValue("summary") == "hour" {
-		p.Granularity = storage.HourlyAverage
-	} else {
-		p.Granularity = storage.IndividualSample
-	}
-
 	parseTime := func(s string) (time.Time, error) {
 		t, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
@@ -136,11 +128,23 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	is := r.FormValue("interval")
+	if is != "" {
+		if d, err := strconv.ParseInt(is, 10, 64); err != nil || d <= 0 {
+			// TODO: Clean up all this repetitive error-reporting.
+			log.Warningf(c, "Query has bad interval %q", is)
+			http.Error(w, "Bad interval", http.StatusBadRequest)
+			return
+		} else {
+			p.UpdateGranularityAndAggregate(time.Duration(d) * time.Second)
+		}
+	}
+
 	// TODO: Passing the ResponseWriter here will probably produce malformed
 	// responses when errors are encountered mid-response. If that ends up being
 	// a problem, either use an intermediate buffer or add a way to communicate
 	// errors mid-response.
-	if err = storage.RunQuery(c, w, p); err != nil {
+	if err = storage.DoQuery(c, w, p); err != nil {
 		log.Errorf(c, "Query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
 	}

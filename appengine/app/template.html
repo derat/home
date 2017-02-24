@@ -67,13 +67,8 @@
 
       function loadData(config, cb) {
         var path = config.path + "&start=" + config.startTime + "&end=" + config.endTime;
-
-        var duration = config.endTime - config.startTime;
-        if (duration / 3600 > MAX_POINTS) {
-          path += "&summary=day";
-        } else if (duration / config.reportSec > MAX_POINTS) {
-          path += "&summary=hour";
-        }
+        if (config.reportSec > 0)
+          path += "&interval=" + config.reportSec;
 
         console.log("Requesting " + path);
         var xhr = new XMLHttpRequest();

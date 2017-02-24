@@ -57,7 +57,7 @@ func checkQuery(t *testing.T, c context.Context, p QueryParams, rows []datarow) 
 	}
 
 	b := &bytes.Buffer{}
-	if err := RunQuery(c, b, p); err != nil {
+	if err := DoQuery(c, b, p); err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
 	tb := table{}
@@ -334,4 +334,35 @@ func TestRunQueryAggregate(t *testing.T) {
 		[]datarow{
 			{"Date(2015,6,1,0,2,30)", []float64{3.5}},
 		})
+}
+
+func TestQueryParamsUpdateGranularityAndAggregate(t *testing.T) {
+	min := func(n int) time.Duration {
+		return time.Minute * time.Duration(n)
+	}
+
+	for _, tc := range []struct {
+		start, end     time.Time
+		sampleInterval time.Duration
+		expGranularity QueryGranularity
+		expAggregate   int
+	}{
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 1, 4, 0, 0), min(5), IndividualSample, 1},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 2, 0, 0, 0), min(5), IndividualSample, 2},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 4, 0, 0, 0), min(5), HourlyAverage, 1},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 8, 0, 0, 0), min(5), HourlyAverage, 1},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 12, 0, 0, 0), min(5), HourlyAverage, 2},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 31, 0, 0, 0), min(5), HourlyAverage, 7},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 3, 1, 0, 0, 0), min(5), DailyAverage, 1},
+		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 8, 1, 0, 0, 0), min(5), DailyAverage, 2},
+	} {
+		qp := QueryParams{Start: tc.start, End: tc.end}
+		qp.UpdateGranularityAndAggregate(tc.sampleInterval)
+		if qp.Granularity != tc.expGranularity {
+			t.Errorf("Expected granularity %v, got %v", tc.expGranularity, qp.Granularity)
+		}
+		if qp.Aggregate != tc.expAggregate {
+			t.Errorf("Expected aggregate %v, got %v", tc.expAggregate, qp.Aggregate)
+		}
+	}
 }
