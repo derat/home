@@ -15,6 +15,7 @@ import (
 
 	"erat.org/home/appengine/storage"
 	"erat.org/home/common"
+	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/user"
@@ -59,15 +60,18 @@ func init() {
 		panic(err)
 	}
 
-	http.HandleFunc("/purge", handlePurge)
-	http.HandleFunc("/query", handleQuery)
-	http.HandleFunc("/report", handleReport)
-	http.HandleFunc("/summarize", handleSummarize)
-	http.HandleFunc("/", handleIndex)
+	http.HandleFunc("/purge", wrapError(handlePurge))
+	http.HandleFunc("/query", wrapError(handleQuery))
+	http.HandleFunc("/report", wrapError(handleReport))
+	http.HandleFunc("/summarize", wrapError(handleSummarize))
+	http.HandleFunc("/", wrapError(handleIndex))
 }
 
-func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
-	c := appengine.NewContext(r)
+// checkAuth verifies that r is from an authorized user. If redirect is true,
+// requests lacking any user info are redirected to the login URL. Returns false
+// and writes an error/redirect to w if the request is not allowed.
+// Returns true without writing anything to w if the request is allowed.
+func checkAuth(c context.Context, w http.ResponseWriter, r *http.Request, redirect bool) bool {
 	u := user.Current(c)
 	if u != nil {
 		for _, e := range cfg.Users {
@@ -90,51 +94,65 @@ func checkAuth(w http.ResponseWriter, r *http.Request, redirect bool) bool {
 	return false
 }
 
-func handlePurge(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	if err := storage.DeleteSummarizedSamples(c, location, cfg.DaysToKeep); err != nil {
-		log.Errorf(c, "Purging samples failed: %v", err)
-		http.Error(w, "Purging samples failed", http.StatusInternalServerError)
-		return
-	}
-	io.WriteString(w, "purging done\n")
+type handlerError struct {
+	// HTTP status code.
+	status int
+	// Message to return in reply.
+	msg string
+	// More-detailed error to log, or nil.
+	err error
 }
 
-func handleQuery(w http.ResponseWriter, r *http.Request) {
-	if !checkAuth(w, r, false) {
-		return
+// wrapError wraps an HTTP handler and handles logging an error and sending an
+// HTTP reply if the handler reports an error. If the handler doesn't report an
+// error, it is responsible for sending the reply itself before returning.
+func wrapError(f func(c context.Context, w http.ResponseWriter,
+	r *http.Request) *handlerError) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := appengine.NewContext(r)
+		if herr := f(c, w, r); herr != nil {
+			log.Errorf(c, "%s: %v", herr.msg, herr.err)
+			http.Error(w, herr.msg, herr.status)
+		}
 	}
+}
 
-	c := appengine.NewContext(r)
+func handlePurge(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
+	if err := storage.DeleteSummarizedSamples(c, location, cfg.DaysToKeep); err != nil {
+		return &handlerError{500, "Purging samples failed", err}
+	}
+	io.WriteString(w, "purging done\n")
+	return nil
+}
+
+func handleQuery(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
+	if !checkAuth(c, w, r, false) {
+		return nil
+	}
 
 	p := storage.QueryParams{}
 	p.Labels = strings.Split(r.FormValue("labels"), ",")
 	p.SourceNames = strings.Split(r.FormValue("names"), ",")
 
-	parseTime := func(s string) (time.Time, error) {
-		t, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			log.Warningf(c, "Query has bad time %q", s)
-			http.Error(w, "Bad time", http.StatusBadRequest)
-			return time.Time{}, err
+	var herr *handlerError
+	parseTime := func(s string) time.Time {
+		if t, err := strconv.ParseInt(s, 10, 64); err != nil {
+			herr = &handlerError{400, "Bad time", err}
+			return time.Time{}
+		} else {
+			return time.Unix(t, 0).In(location)
 		}
-		return time.Unix(t, 0).In(location), nil
 	}
-	var err error
-	if p.Start, err = parseTime(r.FormValue("start")); err != nil {
-		return
-	}
-	if p.End, err = parseTime(r.FormValue("end")); err != nil {
-		return
+	p.Start = parseTime(r.FormValue("start"))
+	p.End = parseTime(r.FormValue("end"))
+	if herr != nil {
+		return herr
 	}
 
 	is := r.FormValue("interval")
 	if is != "" {
 		if d, err := strconv.ParseInt(is, 10, 64); err != nil || d <= 0 {
-			// TODO: Clean up all this repetitive error-reporting.
-			log.Warningf(c, "Query has bad interval %q", is)
-			http.Error(w, "Bad interval", http.StatusBadRequest)
-			return
+			return &handlerError{400, "Bad interval", err}
 		} else {
 			p.UpdateGranularityAndAggregation(time.Duration(d) * time.Second)
 		}
@@ -144,27 +162,21 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 	// responses when errors are encountered mid-response. If that ends up being
 	// a problem, either use an intermediate buffer or add a way to communicate
 	// errors mid-response.
-	if err = storage.DoQuery(c, w, p); err != nil {
-		log.Errorf(c, "Query failed: %v", err)
-		http.Error(w, "Query failed", http.StatusInternalServerError)
+	if err := storage.DoQuery(c, w, p); err != nil {
+		return &handlerError{400, "Query failed", err}
 	}
+	return nil
 }
 
-func handleReport(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-
+func handleReport(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
 	if r.Method != "POST" {
-		log.Warningf(c, "Report has non-POST method %v", r.Method)
-		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
-		return
+		return &handlerError{405, "Invalid method", nil}
 	}
 
 	data := r.PostFormValue("d")
 	sig := r.PostFormValue("s")
 	if sig != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, cfg.ReportSecret)) {
-		log.Warningf(c, "Report has bad signature %q", sig)
-		http.Error(w, "Bad request", http.StatusBadRequest)
-		return
+		return &handlerError{400, "Bad signature", nil}
 	}
 
 	now := time.Now()
@@ -173,39 +185,33 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	for i, line := range lines {
 		s := common.Sample{}
 		if err := s.Parse(line, now); err != nil {
-			log.Warningf(c, "Report has unparseable sample %q: %v", line, err)
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
+			return &handlerError{400, "Bad sample", err}
 		}
 		samples[i] = s
 	}
 
 	log.Debugf(c, "Got report with %v sample(s)", len(samples))
 	if err := storage.WriteSamples(c, samples); err != nil {
-		log.Errorf(c, "Failed to write %v sample(s) to datastore: %v", len(samples), err)
-		http.Error(w, "Write failed", http.StatusInternalServerError)
-		return
+		return &handlerError{500, "Write failed", err}
 	}
 	io.WriteString(w, "got it\n")
+	return nil
 }
 
-func handleSummarize(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
+func handleSummarize(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
 	if err := storage.GenerateSummaries(c, time.Now().In(location),
 		time.Duration(cfg.FullDayDelaySeconds)*time.Second); err != nil {
-		log.Errorf(c, "Generating summaries failed: %v", err)
-		http.Error(w, "Generating summaries failed", http.StatusInternalServerError)
-		return
+		return &handlerError{500, "Generating summaries failed", err}
 	}
 	io.WriteString(w, "summarizing done\n")
+	return nil
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	if !checkAuth(w, r, true) {
-		return
+func handleIndex(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
+	if !checkAuth(c, w, r, true) {
+		return nil
 	}
 
-	c := appengine.NewContext(r)
 	d := struct {
 		Title  string
 		Graphs []templateGraph
@@ -244,7 +250,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := tmpl.Execute(w, d); err != nil {
-		log.Errorf(c, "Executing template failed: %v", err)
-		http.Error(w, "Template failed", http.StatusInternalServerError)
+		return &handlerError{500, "Template failed", err}
 	}
+	return nil
 }
