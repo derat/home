@@ -57,10 +57,12 @@ type QueryParams struct {
 	Aggregation int
 }
 
-// UpdateGranularityAndAggregation updates the Granularity and Aggregation fields
-// based on Start, End, and sampleInterval, the typical interval between
-// samples.
-func (qp *QueryParams) UpdateGranularityAndAggregation(sampleInterval time.Duration) {
+// UpdateGranularityAndAggregation updates the Granularity and Aggregation
+// fields based on Start, End, sampleInterval (the typical interval between
+// samples), and sampleStart (an optional timestamp describing the oldest
+// samples that are available).
+func (qp *QueryParams) UpdateGranularityAndAggregation(
+	sampleInterval time.Duration, sampleStart time.Time) {
 	queryDuration := qp.End.Sub(qp.Start)
 	day := 24 * time.Hour
 	dayCount := int(queryDuration / day)
@@ -69,13 +71,15 @@ func (qp *QueryParams) UpdateGranularityAndAggregation(sampleInterval time.Durat
 	samplesPerHour := int(time.Hour / sampleInterval)
 	hoursPerDay := int(day / time.Hour)
 
+	samplesMissing := !sampleStart.IsZero() && qp.Start.Before(sampleStart)
+
 	qp.Aggregation = 1
 	if hourCount/hoursPerDay*2 > maxQueryPoints {
 		qp.Granularity = DailyAverage
 		if dayCount > maxQueryPoints {
 			qp.Aggregation = dayCount / maxQueryPoints
 		}
-	} else if sampleCount/samplesPerHour*2 > maxQueryPoints {
+	} else if samplesMissing || sampleCount/samplesPerHour*2 > maxQueryPoints {
 		qp.Granularity = HourlyAverage
 		if hourCount > maxQueryPoints {
 			qp.Aggregation = hourCount / maxQueryPoints

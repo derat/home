@@ -52,6 +52,10 @@ func ld(year, month, day int) time.Time {
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, testLoc)
 }
 
+func formatDate(t time.Time) string {
+	return t.Format("2006-01-02")
+}
+
 func checkSamples(t *testing.T, c context.Context, expected []common.Sample) {
 	q := datastore.NewQuery(sampleKind).Order("Timestamp").Order("Source").Order("Name")
 	actual := make([]common.Sample, 0)

@@ -343,26 +343,27 @@ func TestQueryParamsUpdateGranularityAndAggregation(t *testing.T) {
 
 	for _, tc := range []struct {
 		start, end     time.Time
+		sampleStart    time.Time
 		sampleInterval time.Duration
 		expGranularity QueryGranularity
 		expAggregation int
 	}{
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 1, 4, 0, 0), min(5), IndividualSample, 1},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 2, 0, 0, 0), min(5), IndividualSample, 2},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 4, 0, 0, 0), min(5), HourlyAverage, 1},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 8, 0, 0, 0), min(5), HourlyAverage, 1},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 12, 0, 0, 0), min(5), HourlyAverage, 2},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 31, 0, 0, 0), min(5), HourlyAverage, 7},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 3, 1, 0, 0, 0), min(5), DailyAverage, 1},
-		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 8, 1, 0, 0, 0), min(5), DailyAverage, 2},
+		{ld(2015, 1, 1), ld(2015, 1, 1), ld(2015, 1, 1), min(5), IndividualSample, 1},
+		{ld(2015, 1, 1), ld(2015, 1, 2), ld(2015, 1, 1), min(5), IndividualSample, 2},
+		{ld(2015, 1, 1), ld(2015, 1, 4), ld(2015, 1, 1), min(5), HourlyAverage, 1},
+		{ld(2015, 1, 1), ld(2015, 1, 8), ld(2015, 1, 1), min(5), HourlyAverage, 1},
+		{ld(2015, 1, 1), ld(2015, 1, 12), ld(2015, 1, 1), min(5), HourlyAverage, 2},
+		{ld(2015, 1, 1), ld(2015, 1, 31), ld(2015, 1, 1), min(5), HourlyAverage, 7},
+		{ld(2015, 1, 1), ld(2015, 3, 1), ld(2015, 1, 1), min(5), DailyAverage, 1},
+		{ld(2015, 1, 1), ld(2015, 8, 1), ld(2015, 1, 1), min(5), DailyAverage, 2},
+		{ld(2015, 1, 1), ld(2016, 1, 1), ld(2015, 1, 1), min(5), DailyAverage, 3},
 	} {
 		qp := QueryParams{Start: tc.start, End: tc.end}
-		qp.UpdateGranularityAndAggregation(tc.sampleInterval)
-		if qp.Granularity != tc.expGranularity {
-			t.Errorf("Expected granularity %v, got %v", tc.expGranularity, qp.Granularity)
-		}
-		if qp.Aggregation != tc.expAggregation {
-			t.Errorf("Expected aggregation %v, got %v", tc.expAggregation, qp.Aggregation)
+		qp.UpdateGranularityAndAggregation(tc.sampleInterval, tc.sampleStart)
+		if qp.Granularity != tc.expGranularity || qp.Aggregation != tc.expAggregation {
+			t.Errorf("Bad result(s) for %v-%v: granularity %v (exp %v), aggregation %v (exp %v)",
+				formatDate(tc.start), formatDate(tc.end), qp.Granularity, tc.expGranularity,
+				qp.Aggregation, tc.expAggregation)
 		}
 	}
 }

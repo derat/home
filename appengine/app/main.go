@@ -154,7 +154,12 @@ func handleQuery(c context.Context, w http.ResponseWriter, r *http.Request) *han
 		if d, err := strconv.ParseInt(is, 10, 64); err != nil || d <= 0 {
 			return &handlerError{400, "Bad interval", err}
 		} else {
-			p.UpdateGranularityAndAggregation(time.Duration(d) * time.Second)
+			// This is an pessimistic approximation since we're not checking how
+			// far summarization has actually progressed.
+			st := time.Now().In(location).AddDate(0, 0, -1*cfg.DaysToKeep)
+			p.UpdateGranularityAndAggregation(
+				time.Duration(d)*time.Second,
+				time.Date(st.Year(), st.Month(), st.Day(), 0, 0, 0, 0, location))
 		}
 	}
 
