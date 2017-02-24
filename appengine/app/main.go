@@ -136,7 +136,7 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad interval", http.StatusBadRequest)
 			return
 		} else {
-			p.UpdateGranularityAndAggregate(time.Duration(d) * time.Second)
+			p.UpdateGranularityAndAggregation(time.Duration(d) * time.Second)
 		}
 	}
 

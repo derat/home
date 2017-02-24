@@ -4,15 +4,16 @@
 package storage
 
 import (
-	"erat.org/home/common"
 	"fmt"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
 	"io"
 	"math"
 	"strconv"
 	"strings"
 	"time"
+
+	"erat.org/home/common"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
 )
 
 const (
@@ -51,15 +52,15 @@ type QueryParams struct {
 	// Granularity describes the type of points to use.
 	Granularity QueryGranularity
 
-	// Aggregate describes how many sequential points to average together for
+	// Aggregation describes how many sequential points to average together for
 	// each returned point. It has no effect if less than or equal to 1.
-	Aggregate int
+	Aggregation int
 }
 
-// UpdateGranularityAndAggregate updates the Granularity and Aggregate fields
+// UpdateGranularityAndAggregation updates the Granularity and Aggregation fields
 // based on Start, End, and sampleInterval, the typical interval between
 // samples.
-func (qp *QueryParams) UpdateGranularityAndAggregate(sampleInterval time.Duration) {
+func (qp *QueryParams) UpdateGranularityAndAggregation(sampleInterval time.Duration) {
 	queryDuration := qp.End.Sub(qp.Start)
 	day := 24 * time.Hour
 	dayCount := int(queryDuration / day)
@@ -68,21 +69,21 @@ func (qp *QueryParams) UpdateGranularityAndAggregate(sampleInterval time.Duratio
 	samplesPerHour := int(time.Hour / sampleInterval)
 	hoursPerDay := int(day / time.Hour)
 
-	qp.Aggregate = 1
+	qp.Aggregation = 1
 	if hourCount/hoursPerDay*2 > maxQueryPoints {
 		qp.Granularity = DailyAverage
 		if dayCount > maxQueryPoints {
-			qp.Aggregate = dayCount / maxQueryPoints
+			qp.Aggregation = dayCount / maxQueryPoints
 		}
 	} else if sampleCount/samplesPerHour*2 > maxQueryPoints {
 		qp.Granularity = HourlyAverage
 		if hourCount > maxQueryPoints {
-			qp.Aggregate = hourCount / maxQueryPoints
+			qp.Aggregation = hourCount / maxQueryPoints
 		}
 	} else {
 		qp.Granularity = IndividualSample
 		if sampleCount > maxQueryPoints {
-			qp.Aggregate = sampleCount / maxQueryPoints
+			qp.Aggregation = sampleCount / maxQueryPoints
 		}
 	}
 }
@@ -130,8 +131,8 @@ func DoQuery(c context.Context, w io.Writer, qp QueryParams) error {
 			}
 
 			var points []point
-			if qp.Aggregate > 1 {
-				points = make([]point, 0, qp.Aggregate)
+			if qp.Aggregation > 1 {
+				points = make([]point, 0, qp.Aggregation)
 			}
 
 			it := q.Run(c)
@@ -152,7 +153,7 @@ func DoQuery(c context.Context, w io.Writer, qp QueryParams) error {
 					ch <- p
 				} else {
 					points = append(points, p)
-					if len(points) == qp.Aggregate {
+					if len(points) == qp.Aggregation {
 						ch <- averagePoints(points)
 						points = points[:0]
 					}

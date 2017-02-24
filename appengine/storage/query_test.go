@@ -295,7 +295,7 @@ func TestRunQuerySummary(t *testing.T) {
 		})
 }
 
-func TestRunQueryAggregate(t *testing.T) {
+func TestRunQueryAggregation(t *testing.T) {
 	c := initTest()
 
 	if err := WriteSamples(c, []common.Sample{
@@ -336,7 +336,7 @@ func TestRunQueryAggregate(t *testing.T) {
 		})
 }
 
-func TestQueryParamsUpdateGranularityAndAggregate(t *testing.T) {
+func TestQueryParamsUpdateGranularityAndAggregation(t *testing.T) {
 	min := func(n int) time.Duration {
 		return time.Minute * time.Duration(n)
 	}
@@ -345,7 +345,7 @@ func TestQueryParamsUpdateGranularityAndAggregate(t *testing.T) {
 		start, end     time.Time
 		sampleInterval time.Duration
 		expGranularity QueryGranularity
-		expAggregate   int
+		expAggregation int
 	}{
 		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 1, 4, 0, 0), min(5), IndividualSample, 1},
 		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 1, 2, 0, 0, 0), min(5), IndividualSample, 2},
@@ -357,12 +357,12 @@ func TestQueryParamsUpdateGranularityAndAggregate(t *testing.T) {
 		{lt(2015, 1, 1, 0, 0, 0), lt(2015, 8, 1, 0, 0, 0), min(5), DailyAverage, 2},
 	} {
 		qp := QueryParams{Start: tc.start, End: tc.end}
-		qp.UpdateGranularityAndAggregate(tc.sampleInterval)
+		qp.UpdateGranularityAndAggregation(tc.sampleInterval)
 		if qp.Granularity != tc.expGranularity {
 			t.Errorf("Expected granularity %v, got %v", tc.expGranularity, qp.Granularity)
 		}
-		if qp.Aggregate != tc.expAggregate {
-			t.Errorf("Expected aggregate %v, got %v", tc.expAggregate, qp.Aggregate)
+		if qp.Aggregation != tc.expAggregation {
+			t.Errorf("Expected aggregation %v, got %v", tc.expAggregation, qp.Aggregation)
 		}
 	}
 }
