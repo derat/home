@@ -78,7 +78,7 @@ func (c *Condition) msg(s *common.Sample, now time.Time) string {
 	if s == nil {
 		val = "missing"
 	} else {
-		val = fmt.Sprintf("%.1f", c.Value)
+		val = fmt.Sprintf("%.1f", s.Value)
 	}
 	return fmt.Sprintf("%s.%s %s %.1f: %s", c.Source, c.Name, c.Op, c.Value, val)
 }
