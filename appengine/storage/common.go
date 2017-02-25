@@ -14,10 +14,6 @@ const (
 	// Datastore kinds for summary entities.
 	hourSummaryKind = "HourSummary"
 	daySummaryKind  = "DaySummary"
-
-	// Datastore kind and ID for storing the summarization state.
-	summaryStateKind = "SummaryState"
-	summaryStateId   = 1
 )
 
 // summary contains information about a range of samples.
@@ -38,13 +34,6 @@ type summary struct {
 	MinValue float32 `datastore:",noindex"`
 	MaxValue float32 `datastore:",noindex"`
 	AvgValue float32 `datastore:",noindex"`
-}
-
-// summaryState contains high-level information about the current state of
-// summarization.
-type summaryState struct {
-	// LastFullDay contains the starting time of the last fully-summarized day.
-	LastFullDay time.Time
 }
 
 // getMsecSinceTime returns the number of elapsed milliseconds since t.

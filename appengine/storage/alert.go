@@ -14,6 +14,12 @@ import (
 	"google.golang.org/appengine/log"
 )
 
+const (
+	// Datastore kind and ID for storing the alert state.
+	alertStateKind = "AlertState"
+	alertStateId   = 1
+)
+
 // Condition describes a condition responsible for triggering an alert.
 type Condition struct {
 	// Source and name associated with sample.
@@ -28,10 +34,12 @@ type Condition struct {
 	Value float32
 }
 
+// id returns a string uniquely identifying this condition.
 func (c *Condition) id() string {
 	return fmt.Sprintf("%s|%s|%s|%.1f", c.Source, c.Name, c.Op, c.Value)
 }
 
+// active returns true if s is active.
 func (c *Condition) active(s *common.Sample, now time.Time) (bool, error) {
 	switch c.Op {
 	case "eq":
@@ -53,6 +61,8 @@ func (c *Condition) active(s *common.Sample, now time.Time) (bool, error) {
 	}
 }
 
+// msg returns a human-readable string describing the condition and the current
+// value of its sample.
 func (c *Condition) msg(s *common.Sample, now time.Time) string {
 	if c.Op == "ot" {
 		var age string
@@ -72,34 +82,52 @@ func (c *Condition) msg(s *common.Sample, now time.Time) string {
 	return fmt.Sprintf("%s.%s %s %.1f: %s", c.Source, c.Name, c.Op, c.Value, val)
 }
 
-// activeCondition contains information about a currently-active condition.
-type activeCondition struct {
-	id  string
-	msg string
+// conditionState contains information about a condition's current state.
+type conditionState struct {
+	// ID uniquely identifying the condition.
+	Id string
+
+	// True the condition became active, or zero if inactive.
+	ActiveTime time.Time
+
+	// Human-readable string describing the condition and its sample's current
+	// value.
+	Msg string
+}
+
+// alertState describes the current alerting state.
+type alertState struct {
+	ActiveConditions []conditionState
+
+	// Last time at which conditions were evaluated.
+	LastEvalTime time.Time
 }
 
 func EvaluateConds(c context.Context, conds []Condition, now time.Time) error {
 	log.Debugf(c, "Querying for samples for %v condition(s)", len(conds))
-	samples, err := getSamplesForConds(c, conds)
+	samples, err := getSamplesForConditions(c, conds)
 	if err != nil {
 		return err
 	}
 	log.Debugf(c, "Got %v sample(s)", len(samples))
 
-	acs, err := getActiveConds(conds, samples, now)
+	states, err := getConditionStates(conds, samples, now)
 	if err != nil {
 		return err
 	}
-	for _, ac := range acs {
-		log.Debugf(c, "Active condition %v: %v", ac.id, ac.msg)
+
+	_, _, _, err = updateAlertState(c, states, now)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
 
-// getSamplesForConds queries for and returns the most recent samples needed to
-// evaluate conds. The returned map is keyed by "source|name", and values may be
-// nil if corresponding samples weren't found in the datastore.
-func getSamplesForConds(c context.Context, conds []Condition) (
+// getSamplesForConditions queries for and returns the most recent samples
+// needed to evaluate conds. The returned map is keyed by "source|name" and
+// values may be nil if corresponding samples weren't found in the datastore.
+func getSamplesForConditions(c context.Context, conds []Condition) (
 	map[string]*common.Sample, error) {
 	samples := make(map[string]*common.Sample)
 	for _, cond := range conds {
@@ -144,20 +172,67 @@ func getSamplesForConds(c context.Context, conds []Condition) (
 	return samples, nil
 }
 
-// getActiveConds returns active conditions. samples is keyed by "source|name",
-// and values may be nil.
-func getActiveConds(conds []Condition, samples map[string]*common.Sample, now time.Time) (
-	[]activeCondition, error) {
-	acs := make([]activeCondition, 0)
-	for _, cond := range conds {
+// getConditionStates returns the current states of conditions. samples is keyed
+// by "source|name" and values may be nil.
+func getConditionStates(conds []Condition, samples map[string]*common.Sample,
+	now time.Time) ([]conditionState, error) {
+	states := make([]conditionState, len(conds))
+	for i, cond := range conds {
 		s := samples[cond.Source+"|"+cond.Name]
-		active, err := cond.active(s, now)
-		if err != nil {
+		if active, err := cond.active(s, now); err != nil {
 			return nil, err
-		}
-		if active {
-			acs = append(acs, activeCondition{cond.id(), cond.msg(s, now)})
+		} else {
+			activeTime := time.Time{}
+			if active {
+				activeTime = now
+			}
+			states[i] = conditionState{cond.id(), activeTime, cond.msg(s, now)}
 		}
 	}
-	return acs, nil
+	return states, nil
+}
+
+// updateAlertState gets the current alerting state, identifies newly-active,
+// continuing-to-be-active, and no-longer-active conditions, and saves the
+// updated state.
+func updateAlertState(c context.Context, ns []conditionState, now time.Time) (
+	start, cont, end []conditionState, err error) {
+	as := alertState{}
+	k := datastore.NewKey(c, alertStateKind, "", alertStateId, nil)
+	if err = datastore.Get(c, k, &as); err != nil && err != datastore.ErrNoSuchEntity {
+		return nil, nil, nil, err
+	}
+	om := make(map[string]conditionState)
+	if as.ActiveConditions != nil {
+		for _, s := range as.ActiveConditions {
+			om[s.Id] = s
+		}
+	}
+
+	start = make([]conditionState, 0)
+	cont = make([]conditionState, 0)
+	end = make([]conditionState, 0)
+	for _, s := range ns {
+		if !s.ActiveTime.IsZero() {
+			if os, ok := om[s.Id]; ok {
+				s.ActiveTime = os.ActiveTime
+				cont = append(cont, s)
+			} else {
+				s.ActiveTime = now
+				start = append(start, s)
+			}
+		} else {
+			if os, ok := om[s.Id]; ok {
+				s.ActiveTime = os.ActiveTime
+				end = append(end, s)
+			}
+		}
+	}
+
+	as.ActiveConditions = append(start, cont...)
+	as.LastEvalTime = now
+	if _, err = datastore.Put(c, k, &as); err != nil {
+		return nil, nil, nil, err
+	}
+	return start, cont, end, nil
 }

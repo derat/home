@@ -18,6 +18,10 @@ const (
 	// App Engine imposes a limit of 500 entities per write operation.
 	summaryUpdateBatchSize = 500
 	summaryDeleteBatchSize = 500
+
+	// Datastore kind and ID for storing the summarization state.
+	summaryStateKind = "SummaryState"
+	summaryStateId   = 1
 )
 
 // GenerateSummaries reads samples and inserts daily and hourly summary
@@ -115,6 +119,13 @@ func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep i
 		}
 	}
 	return nil
+}
+
+// summaryState contains high-level information about the current state of
+// summarization.
+type summaryState struct {
+	// LastFullDay contains the starting time of the last fully-summarized day.
+	LastFullDay time.Time
 }
 
 // getSummaryId returns the ID that should be used for storing s in the
