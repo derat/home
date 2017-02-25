@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/mail"
 )
 
 const (
@@ -103,24 +104,27 @@ type alertState struct {
 	LastEvalTime time.Time
 }
 
-func EvaluateConds(c context.Context, conds []Condition, now time.Time) error {
-	log.Debugf(c, "Querying for samples for %v condition(s)", len(conds))
+func EvaluateConds(c context.Context, conds []Condition, now time.Time,
+	sender string, recipients []string) error {
+	log.Debugf(c, "Getting samples for %v condition(s)", len(conds))
 	samples, err := getSamplesForConditions(c, conds)
 	if err != nil {
 		return err
 	}
-	log.Debugf(c, "Got %v sample(s)", len(samples))
-
+	log.Debugf(c, "Evaluating condition(s) against %v sample(s)", len(samples))
 	states, err := getConditionStates(conds, samples, now)
 	if err != nil {
 		return err
 	}
-
-	_, _, _, err = updateAlertState(c, states, now)
+	log.Debugf(c, "Updating alert state")
+	start, cont, end, err := updateAlertState(c, states, now)
 	if err != nil {
 		return err
 	}
-
+	if msg := createAlertMessage(sender, recipients, start, cont, end); msg != nil {
+		log.Debugf(c, "Sending email: %v", msg.Body)
+		return mail.Send(c, msg)
+	}
 	return nil
 }
 
@@ -235,4 +239,38 @@ func updateAlertState(c context.Context, ns []conditionState, now time.Time) (
 		return nil, nil, nil, err
 	}
 	return start, cont, end, nil
+}
+
+func createAlertMessage(sender string, recipients []string, start, cont, end []conditionState) *mail.Message {
+	// If nothing's changed, bail out.
+	if len(start) == 0 && len(end) == 0 {
+		return nil
+	}
+
+	fc := func(heading string, states []conditionState) string {
+		strs := make([]string, len(states))
+		for i, s := range states {
+			strs[i] = s.Msg
+		}
+		return fmt.Sprintf("%s\n%s", heading, strings.Join(strs, "\n"))
+	}
+
+	lines := make([]string, 0)
+	if len(start) > 0 {
+		lines = append(lines, fc("New alerts:", start))
+	}
+	if len(end) > 0 {
+		lines = append(lines, fc("Ended alerts:", end))
+	}
+	if len(cont) > 0 {
+		lines = append(lines, fc("Continuing alerts:", cont))
+	}
+	body := strings.Join(lines, "\n\n")
+
+	return &mail.Message{
+		Sender:  sender,
+		To:      recipients,
+		Subject: "Alerts updated",
+		Body:    body,
+	}
 }

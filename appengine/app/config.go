@@ -70,8 +70,13 @@ type config struct {
 	// Time zone, e.g. "America/Los_Angeles".
 	TimeZone string
 
-	// Email address to which alerts should be sent.
-	AlertEmail string
+	// Email address from which alerts will be sent. See
+	// https://cloud.google.com/appengine/docs/standard/python/mail/#who_can_send_mail
+	// for allowed addresses.
+	AlertSender string
+
+	// Email addresses to which alerts will be sent.
+	AlertRecipients []string
 
 	// Conditions that trigger alerts.
 	AlertConditions []storage.Condition

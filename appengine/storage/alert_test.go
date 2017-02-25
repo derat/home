@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"erat.org/home/common"
+	"google.golang.org/appengine/mail"
 )
 
 func TestGetSamplesForConditions(t *testing.T) {
@@ -213,6 +214,47 @@ func TestUpdateAlertState(t *testing.T) {
 	// At t6, remove the new condition.
 	t6 := time.Unix(6, 0)
 	checkStates(t6, acs{}, acs{}, acs{}, acs{})
+}
+
+func TestCreateAlertMessage(t *testing.T) {
+	const (
+		recipient = "recipiet@example.com"
+		sender    = "sender@example.com"
+		cm        = "foo"
+	)
+
+	recipients := []string{recipient}
+	empty := []conditionState{}
+	nonempty := []conditionState{conditionState{"", time.Time{}, cm}}
+
+	if msg := createAlertMessage(sender, recipients, empty, empty, empty); msg != nil {
+		t.Errorf("Created unexpected message")
+	}
+	if msg := createAlertMessage(sender, recipients, empty, nonempty, empty); msg != nil {
+		t.Errorf("Created unexpected message")
+	}
+
+	checkMsg := func(start, cont, end []conditionState, body string) {
+		var msg *mail.Message
+		if msg = createAlertMessage(sender, recipients, start, cont, end); msg == nil {
+			t.Errorf("Message wasn't created")
+			return
+		}
+		if msg.Sender != sender {
+			t.Errorf("Expected sender %q, got %q", sender, msg.Sender)
+		}
+		if strings.Join(msg.To, ",") != recipient {
+			t.Errorf("Expected recipient %q, got %q", recipient, strings.Join(msg.To, ","))
+		}
+		if msg.Body != body {
+			t.Errorf("Expected body %q, got %q", body, msg.Body)
+		}
+	}
+
+	checkMsg(nonempty, empty, empty, "New alerts:\nfoo")
+	checkMsg(empty, empty, nonempty, "Ended alerts:\nfoo")
+	checkMsg(nonempty, nonempty, empty, "New alerts:\nfoo\n\nContinuing alerts:\nfoo")
+	checkMsg(nonempty, nonempty, nonempty, "New alerts:\nfoo\n\nEnded alerts:\nfoo\n\nContinuing alerts:\nfoo")
 }
 
 func joinConditionStates(states []conditionState) string {

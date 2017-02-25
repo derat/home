@@ -27,3 +27,10 @@ indexes:
   - name: Name
   - name: Source
   - name: Timestamp
+
+- kind: Sample
+  properties:
+  - name: Name
+  - name: Source
+  - name: Timestamp
+    direction: desc

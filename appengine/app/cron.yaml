@@ -6,3 +6,6 @@ cron:
   url: /purge
   # Do this a bit more often since it fails so frequently. :-(
   schedule: every 6 hours
+- description: eval alerts
+  url: /eval
+  schedule: every 1 minutes

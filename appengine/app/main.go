@@ -119,7 +119,8 @@ func wrapError(f func(c context.Context, w http.ResponseWriter,
 }
 
 func handleEval(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
-	if err := storage.EvaluateConds(c, cfg.AlertConditions, time.Now()); err != nil {
+	if err := storage.EvaluateConds(c, cfg.AlertConditions, time.Now().In(location),
+		cfg.AlertSender, cfg.AlertRecipients); err != nil {
 		return &handlerError{500, "Evaluating alert conditions failed", err}
 	}
 	return nil
