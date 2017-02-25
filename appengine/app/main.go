@@ -60,6 +60,7 @@ func init() {
 		panic(err)
 	}
 
+	http.HandleFunc("/eval", wrapError(handleEval))
 	http.HandleFunc("/purge", wrapError(handlePurge))
 	http.HandleFunc("/query", wrapError(handleQuery))
 	http.HandleFunc("/report", wrapError(handleReport))
@@ -115,6 +116,13 @@ func wrapError(f func(c context.Context, w http.ResponseWriter,
 			http.Error(w, herr.msg, herr.status)
 		}
 	}
+}
+
+func handleEval(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {
+	if err := storage.EvaluateConds(c, cfg.AlertConditions, time.Now()); err != nil {
+		return &handlerError{500, "Evaluating alert conditions failed", err}
+	}
+	return nil
 }
 
 func handlePurge(c context.Context, w http.ResponseWriter, r *http.Request) *handlerError {

@@ -59,3 +59,18 @@ func JoinSamples(samples []Sample) string {
 	}
 	return strings.Join(d, "\n")
 }
+
+type SampleArray []Sample
+
+func (a SampleArray) Len() int      { return len(a) }
+func (a SampleArray) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a SampleArray) Less(i, j int) bool {
+	if !a[i].Timestamp.Equal(a[j].Timestamp) {
+		return a[i].Timestamp.Before(a[j].Timestamp)
+	} else if a[i].Source != a[j].Source {
+		return a[i].Source < a[j].Source
+	} else if a[i].Name != a[j].Name {
+		return a[i].Name < a[j].Name
+	}
+	return a[i].Value < a[j].Value
+}

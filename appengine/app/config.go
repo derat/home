@@ -6,6 +6,7 @@ package app
 import (
 	"time"
 
+	"erat.org/home/appengine/storage"
 	"erat.org/home/common"
 	"google.golang.org/appengine"
 )
@@ -69,8 +70,17 @@ type config struct {
 	// Time zone, e.g. "America/Los_Angeles".
 	TimeZone string
 
+	// Email address to which alerts should be sent.
+	AlertEmail string
+
+	// Conditions that trigger alerts.
+	AlertConditions []storage.Condition
+
 	// Page title.
 	Title string
+
+	// Graphs to display on page.
+	Graphs []graphConfig
 
 	// Days of fully-summarized samples to keep. Older samples are deleted
 	// periodically.
@@ -80,9 +90,6 @@ type config struct {
 	// won't get any new samples for it (and don't need to continue
 	// re-summarizing it).
 	FullDayDelaySeconds int
-
-	// Graphs to display on page.
-	Graphs []graphConfig
 }
 
 func loadConfig(path string) (*config, *time.Location, error) {

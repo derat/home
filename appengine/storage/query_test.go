@@ -234,7 +234,6 @@ func TestRunQuery(t *testing.T) {
 
 func TestRunQuerySummary(t *testing.T) {
 	c := initTest()
-
 	if err := WriteSamples(c, []common.Sample{
 		common.Sample{lt(2015, 7, 1, 0, 0, 0), "a", "b", 1.0},
 		common.Sample{lt(2015, 7, 2, 0, 0, 0), "a", "b", 2.0},

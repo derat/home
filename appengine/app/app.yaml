@@ -7,7 +7,7 @@ builtins:
 - remote_api: on
 
 handlers:
-- url: /(purge|summarize)
+- url: /(eval|purge|summarize)
   script: _go_app
   secure: always
   login: admin
