@@ -17,7 +17,14 @@ import (
 const (
 	// App Engine imposes a limit of 500 entities per write operation.
 	summaryUpdateBatchSize = 500
-	summaryDeleteBatchSize = 500
+
+	// Deleting 500 samples at once seems to hit the 5-second RPC deadline quite
+	// often, so delete smaller batches instead.
+	summaryDeleteBatchSize = 300
+
+	// Maximum number of consecutive delete errors that can be encountered
+	// before giving up.
+	maxSummaryDeleteErrors = 2
 
 	// Datastore kind and ID for storing the summarization state.
 	summaryStateKind = "SummaryState"
@@ -93,11 +100,12 @@ func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep i
 		return nil
 	}
 	keepDay := lastFullDay.In(loc).AddDate(0, 0, 1-daysToKeep)
-
 	log.Debugf(c, "Deleting all samples earlier than %4d-%02d-%02d",
 		keepDay.Year(), keepDay.Month(), keepDay.Day())
+
 	q := datastore.NewQuery(sampleKind).KeysOnly().
 		Filter("Timestamp <", keepDay).Limit(summaryDeleteBatchSize)
+	errors := 0
 	for {
 		var keys []*datastore.Key
 		log.Debugf(c, "Querying for samples")
@@ -106,10 +114,20 @@ func DeleteSummarizedSamples(c context.Context, loc *time.Location, daysToKeep i
 		} else if len(keys) == 0 {
 			break
 		}
+
 		log.Debugf(c, "Deleting %v sample(s)", len(keys))
 		if err = datastore.DeleteMulti(c, keys); err != nil {
-			return err
+			errors++
+			if errors > maxSummaryDeleteErrors {
+				return err
+			}
+			log.Warningf(c, "Retrying after error while deleting: %v", err)
+			continue
 		}
+
+		// Reset the count since we're making forward progress.
+		errors = 0
+
 		// If we didn't get a full set of keys, assume that this was the final
 		// delete. Otherwise, it looks like we can continue receiving query
 		// results for a while longer -- is this due to eventual consistency
