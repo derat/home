@@ -6,7 +6,7 @@
     <title>{{.Title}}</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script>
-      google.charts.load('current', {packages: ['line']});
+      google.charts.load('current', {packages: ['corechart']});
       google.charts.setOnLoadCallback(drawCharts);
 
       var configs = {};
@@ -38,10 +38,8 @@
           startTime: now - {{.Seconds}},
           endTime: now,
           reportSec: {{.ReportSeconds}},
-          options: google.charts.Line.convertOptions({
-            chart: {
-              title: {{.Title}},
-            },
+          options: {
+            title: {{.Title}},
             vAxis: {
               title: {{.Units}},
               viewWindow: {
@@ -49,8 +47,11 @@
                 max: {{if .HasMax}}{{.Max}}{{else}}null{{end}}
               }
             },
+            // Workaround for narrow legend:
+            // http://stackoverflow.com/questions/6869967/how-to-set-google-charts-legend-width-in-javascript
+            chartArea: { width: '60%' },
             interpolateNulls: true
-          })
+          }
         };
 
         loadData(configs[{{.Id}}], createChart.bind(null, {{.Id}}));
@@ -88,7 +89,7 @@
 
       function createChart(id, data) {
         var config = configs[id];
-        config.chart = new google.charts.Line(document.getElementById(id));
+        config.chart = new google.visualization.LineChart(document.getElementById(id));
         config.chart.draw(parseResponse(data), config.options);
       }
 
