@@ -41,11 +41,23 @@
           options: {
             title: {{.Title}},
             vAxis: {
+              gridlines: {
+                color: '#eee'
+              },
               title: {{.Units}},
               viewWindow: {
                 min: {{if .HasMin}}{{.Min}}{{else}}null{{end}},
                 max: {{if .HasMax}}{{.Max}}{{else}}null{{end}}
               }
+            },
+            hAxis: {
+              gridlines: {
+                color: '#eee'
+              },
+              // At least with non-MD charts, short graphs' labels appear are
+              // pointlessly rotated by 45 degress and then truncated on
+              // desktop.
+              slantedText: false
             },
             chartArea: {
               width: '80%'
