@@ -188,9 +188,11 @@ func handleReport(c context.Context, w http.ResponseWriter, r *http.Request) *ha
 	}
 
 	data := r.PostFormValue("d")
-	sig := r.PostFormValue("s")
-	if sig != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, cfg.ReportSecret)) {
-		return &handlerError{400, "Bad signature", nil}
+	if !appengine.IsDevAppServer() {
+		sig := r.PostFormValue("s")
+		if sig != common.HashStringWithSHA256(fmt.Sprintf("%s|%s", data, cfg.ReportSecret)) {
+			return &handlerError{400, "Bad signature", nil}
+		}
 	}
 
 	now := time.Now()
