@@ -47,9 +47,12 @@
                 max: {{if .HasMax}}{{.Max}}{{else}}null{{end}}
               }
             },
-            // Workaround for narrow legend:
-            // http://stackoverflow.com/questions/6869967/how-to-set-google-charts-legend-width-in-javascript
-            chartArea: { width: '60%' },
+            chartArea: {
+              width: '80%'
+            },
+            legend: {
+              position: 'bottom',
+            },
             interpolateNulls: true
           }
         };
@@ -143,11 +146,11 @@
         display: flex;
         justify-content: space-between;
         max-width: calc(100% - 20px);
-        padding-left: 40px;
-        width: 400px;
+        width: 600px;
       }
       .controls span {
         cursor: pointer;
+        margin: 0 30px;
       }
       .controls span:hover {
         text-decoration: underline;
