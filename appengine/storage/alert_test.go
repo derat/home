@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/home/common"
 	"google.golang.org/appengine/mail"
+
+	"erat.org/home/common"
 )
 
 func TestGetSamplesForConditions(t *testing.T) {

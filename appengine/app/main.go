@@ -1,9 +1,11 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
-package app
+package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"io"
@@ -13,12 +15,12 @@ import (
 	"strings"
 	"time"
 
-	"erat.org/home/appengine/storage"
-	"erat.org/home/common"
-	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/user"
+
+	"erat.org/home/appengine/storage"
+	"erat.org/home/common"
 )
 
 const (
@@ -46,7 +48,7 @@ var cfg *config
 var location *time.Location
 var tmpl *template.Template
 
-func init() {
+func main() {
 	var err error
 	if cfg, location, err = loadConfig(configPath); err != nil {
 		panic(err)
@@ -66,6 +68,8 @@ func init() {
 	http.HandleFunc("/report", wrapError(handleReport))
 	http.HandleFunc("/summarize", wrapError(handleSummarize))
 	http.HandleFunc("/", wrapError(handleIndex))
+
+	appengine.Main()
 }
 
 // checkAuth verifies that r is from an authorized user. If redirect is true,
@@ -172,12 +176,12 @@ func handleQuery(c context.Context, w http.ResponseWriter, r *http.Request) *han
 		}
 	}
 
-	// TODO: Passing the ResponseWriter here will probably produce malformed
-	// responses when errors are encountered mid-response. If that ends up being
-	// a problem, either use an intermediate buffer or add a way to communicate
-	// errors mid-response.
-	if err := storage.DoQuery(c, w, p); err != nil {
-		return &handlerError{400, "Query failed", err}
+	var b bytes.Buffer
+	if err := storage.DoQuery(c, &b, p); err != nil {
+		return &handlerError{500, "Query failed", err}
+	}
+	if _, err := io.Copy(w, &b); err != nil {
+		return &handlerError{500, "Failed copying query results", err}
 	}
 	return nil
 }

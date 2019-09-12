@@ -4,11 +4,12 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
-	"erat.org/home/common"
-	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
+
+	"erat.org/home/common"
 )
 
 // WriteSamples writes samples to datastore.

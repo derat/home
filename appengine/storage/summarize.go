@@ -4,14 +4,15 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
 
-	"erat.org/home/common"
-	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+
+	"erat.org/home/common"
 )
 
 const (

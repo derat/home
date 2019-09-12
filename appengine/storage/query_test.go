@@ -5,6 +5,7 @@ package storage
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"erat.org/home/common"
-	"golang.org/x/net/context"
 )
 
 func makePoint(t int, value float32) point {
@@ -74,10 +74,10 @@ func checkQuery(t *testing.T, c context.Context, p QueryParams, rows []datarow) 
 		}
 		for i := range p.SourceNames {
 			if tb.Cols[i+1].Label != p.Labels[i] {
-				t.Errorf("Column %i has label %q instead of %q", tb.Cols[i+1].Label, p.Labels[i])
+				t.Errorf("Column %d has label %q instead of %q", i+1, tb.Cols[i+1].Label, p.Labels[i])
 			}
 			if tb.Cols[i+1].Type != "number" {
-				t.Errorf("Column %i has type %q instead of %q", tb.Cols[i+1].Type, "number")
+				t.Errorf("Column %d has type %q instead of %q", i+1, tb.Cols[i+1].Type, "number")
 			}
 		}
 	}

@@ -4,15 +4,16 @@
 package storage
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
-	"erat.org/home/common"
-	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 	"google.golang.org/appengine/datastore"
+
+	"erat.org/home/common"
 )
 
 var testLoc *time.Location
