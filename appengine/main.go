@@ -15,12 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/home/appengine/storage"
+	"github.com/derat/home/common"
+
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/user"
-
-	"erat.org/home/appengine/storage"
-	"erat.org/home/common"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 	configPath = "config.json"
 
 	// Path of template file relative to base app directory.
-	templatePath = "template.html"
+	templatePath = "appengine/template.html"
 )
 
 // templateGraph is used to pass graph information to the template.

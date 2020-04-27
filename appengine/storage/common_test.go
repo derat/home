@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/derat/home/common"
+
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 	"google.golang.org/appengine/datastore"
-
-	"erat.org/home/common"
 )
 
 var testLoc *time.Location

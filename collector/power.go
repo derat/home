@@ -4,11 +4,12 @@
 package main
 
 import (
-	"erat.org/home/common"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/derat/home/common"
 )
 
 type powerStats struct {

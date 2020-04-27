@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/home/common"
+	"github.com/derat/home/common"
 )
 
 func makePoint(t int, value float32) point {

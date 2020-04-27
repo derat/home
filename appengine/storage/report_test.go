@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"erat.org/home/common"
+	"github.com/derat/home/common"
 )
 
 func TestWriteSamples(t *testing.T) {

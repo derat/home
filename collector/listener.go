@@ -4,10 +4,11 @@
 package main
 
 import (
-	"erat.org/home/common"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/derat/home/common"
 )
 
 type listener struct {

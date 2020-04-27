@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derat/home/common"
+
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/mail"
-
-	"erat.org/home/common"
 )
 
 const (

@@ -1,0 +1,11 @@
+runtime: go111
+main: appengine
+
+handlers:
+- url: /(eval|purge|summarize)
+  script: auto
+  secure: always
+  login: admin
+- url: /(|query|report)
+  script: auto
+  secure: always

@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/json"
-	"erat.org/home/common"
 	"fmt"
 	"io"
 	"math"
@@ -15,6 +14,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/derat/home/common"
 )
 
 const tempBackingFileExtension = ".new"

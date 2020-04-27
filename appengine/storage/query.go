@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/appengine/datastore"
+	"github.com/derat/home/common"
 
-	"erat.org/home/common"
+	"google.golang.org/appengine/datastore"
 )
 
 const (

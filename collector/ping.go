@@ -4,12 +4,13 @@
 package main
 
 import (
-	"erat.org/home/common"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/derat/home/common"
 )
 
 const pingPath = "/bin/ping"

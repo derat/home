@@ -4,8 +4,9 @@
 package main
 
 import (
-	"erat.org/home/common"
 	"log"
+
+	"github.com/derat/home/common"
 )
 
 type config struct {

@@ -6,8 +6,9 @@ package main
 import (
 	"time"
 
-	"erat.org/home/appengine/storage"
-	"erat.org/home/common"
+	"github.com/derat/home/appengine/storage"
+	"github.com/derat/home/common"
+
 	"google.golang.org/appengine"
 )
 

@@ -4,7 +4,6 @@
 package main
 
 import (
-	"erat.org/home/common"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,6 +13,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/derat/home/common"
 )
 
 const (

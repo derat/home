@@ -9,10 +9,10 @@ import (
 	"math"
 	"time"
 
+	"github.com/derat/home/common"
+
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
-
-	"erat.org/home/common"
 )
 
 const (
