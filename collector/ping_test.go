@@ -20,7 +20,7 @@ func getConfig(host string, count, delayMs, timeoutSec int) *config {
 		PingCount:      count,
 		PingDelayMs:    delayMs,
 		PingTimeoutSec: timeoutSec,
-		Logger:         log.New(out, "", log.LstdFlags),
+		logger:         log.New(out, "", log.LstdFlags),
 	}
 }
 

@@ -25,7 +25,7 @@ func TestParsePowerCommandOutput(t *testing.T) {
 		lo = os.Stderr
 	}
 	cfg := &config{
-		Logger: log.New(lo, "", log.LstdFlags),
+		logger: log.New(lo, "", log.LstdFlags),
 	}
 
 	o := `
@@ -35,10 +35,10 @@ load_percent 17.2
 battery_percent 100.0
 `
 	e := &powerStats{
-		OnLine:         true,
-		LineVoltage:    119.5,
-		LoadPercent:    17.2,
-		BatteryPercent: 100.0,
+		onLine:         true,
+		lineVoltage:    119.5,
+		loadPercent:    17.2,
+		batteryPercent: 100.0,
 	}
 	a := &powerStats{}
 	parsePowerCommandOutput(cfg, o, a)
@@ -55,10 +55,10 @@ load_percent 21.5
 battery_percent 65.5
 `
 	e = &powerStats{
-		OnLine:         false,
-		LineVoltage:    0.0,
-		LoadPercent:    21.5,
-		BatteryPercent: 65.5,
+		onLine:         false,
+		lineVoltage:    0.0,
+		loadPercent:    21.5,
+		batteryPercent: 65.5,
 	}
 	a = &powerStats{}
 	parsePowerCommandOutput(cfg, o, a)
@@ -75,10 +75,10 @@ blah blah 5
 abc
 `
 	e = &powerStats{
-		OnLine:         false,
-		LineVoltage:    0.0,
-		LoadPercent:    0.0,
-		BatteryPercent: 0.0,
+		onLine:         false,
+		lineVoltage:    0.0,
+		loadPercent:    0.0,
+		batteryPercent: 0.0,
 	}
 	a = &powerStats{}
 	parsePowerCommandOutput(cfg, o, a)

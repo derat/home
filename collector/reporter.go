@@ -58,7 +58,7 @@ func newReporter(cfg *config) *reporter {
 	if _, err := os.Stat(cfg.BackingFile); err == nil {
 		samples, err := r.readSamplesFromBackingFile()
 		if err != nil {
-			r.cfg.Logger.Printf("Failed to read samples from %v: %v", cfg.BackingFile, err)
+			r.cfg.logger.Printf("Failed to read samples from %v: %v", cfg.BackingFile, err)
 		} else {
 			r.queuedSamples = samples
 			r.backingFileSamples = samples
@@ -88,7 +88,7 @@ func (r *reporter) reportSample(s common.Sample) {
 
 func (r *reporter) reportSamples(samples []common.Sample) {
 	for _, s := range samples {
-		r.cfg.Logger.Printf("Queuing %v", s.String())
+		r.cfg.logger.Printf("Queuing %v", s.String())
 	}
 	r.cond.L.Lock()
 	r.queuedSamples = append(r.queuedSamples, samples...)
@@ -107,9 +107,9 @@ func (r *reporter) processSamples() {
 			r.cond.Wait()
 		}
 		if r.stopping {
-			r.cfg.Logger.Printf("Reporter loop exiting")
+			r.cfg.logger.Printf("Reporter loop exiting")
 			if err := r.writeSamplesToBackingFile(r.queuedSamples); err != nil {
-				r.cfg.Logger.Printf("Failed to write samples: %v", err)
+				r.cfg.logger.Printf("Failed to write samples: %v", err)
 			}
 			r.wg.Done()
 			return
@@ -118,18 +118,18 @@ func (r *reporter) processSamples() {
 		r.queuedSamples = make([]common.Sample, 0)
 		r.cond.L.Unlock()
 
-		r.cfg.Logger.Printf("Took %v sample(s) from queue", len(samples))
+		r.cfg.logger.Printf("Took %v sample(s) from queue", len(samples))
 
 		gotError := false
 		for len(samples) > 0 {
 			n := int(math.Min(float64(len(samples)), float64(r.cfg.ReportBatchSize)))
 			s := samples[:n]
 			if err := r.sendSamplesToServer(s); err != nil {
-				r.cfg.Logger.Printf("Got error when reporting samples: %v", err)
+				r.cfg.logger.Printf("Got error when reporting samples: %v", err)
 				gotError = true
 				break
 			}
-			r.cfg.Logger.Printf("Successfully reported %v sample(s)", len(s))
+			r.cfg.logger.Printf("Successfully reported %v sample(s)", len(s))
 			samples = samples[n:]
 		}
 
@@ -137,7 +137,7 @@ func (r *reporter) processSamples() {
 		if gotError {
 			// Return any samples that weren't forwarded successfully back to the
 			// beginning of the queue.
-			r.cfg.Logger.Printf("Returning %v unreported sample(s) to queue", len(samples))
+			r.cfg.logger.Printf("Returning %v unreported sample(s) to queue", len(samples))
 			r.queuedSamples = append(samples, r.queuedSamples...)
 		}
 		var newBackingFileSamples []common.Sample
@@ -147,14 +147,14 @@ func (r *reporter) processSamples() {
 		r.cond.L.Unlock()
 
 		if newBackingFileSamples != nil {
-			r.cfg.Logger.Printf("Writing %v sample(s) to backing file", len(newBackingFileSamples))
+			r.cfg.logger.Printf("Writing %v sample(s) to backing file", len(newBackingFileSamples))
 			if err := r.writeSamplesToBackingFile(newBackingFileSamples); err != nil {
-				r.cfg.Logger.Printf("Failed to write samples: %v", err)
+				r.cfg.logger.Printf("Failed to write samples: %v", err)
 			}
 		}
 
 		if gotError {
-			r.cfg.Logger.Printf("Sleeping for %v ms after failure", r.cfg.ReportRetryMs)
+			r.cfg.logger.Printf("Sleeping for %v ms after failure", r.cfg.ReportRetryMs)
 			go func(ch chan bool) {
 				time.Sleep(time.Duration(r.cfg.ReportRetryMs) * time.Millisecond)
 				ch <- true

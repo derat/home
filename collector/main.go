@@ -1,6 +1,7 @@
 // Copyright 2017 Daniel Erat <dan@erat.org>
 // All rights reserved.
 
+// Package main implements a daemon that collects local data and sends it to the App Engine server.
 package main
 
 import (

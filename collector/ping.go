@@ -55,11 +55,11 @@ func getPingStats(cfg *config) *pingStats {
 
 	var tx, rx float32
 	if cm := countRegexp.FindStringSubmatch(string(out)); cm == nil {
-		cfg.Logger.Printf("Didn't find ping count in %q", string(out))
+		cfg.logger.Printf("Didn't find ping count in %q", string(out))
 		s.commandFailed = true
 		return s
 	} else if counts, err := parseFloats(cm[1:]); err != nil {
-		cfg.Logger.Printf("Failed to parse ping counts from %q: %v", cm[0], err)
+		cfg.logger.Printf("Failed to parse ping counts from %q: %v", cm[0], err)
 		s.commandFailed = true
 		return s
 	} else {
@@ -72,15 +72,15 @@ func getPingStats(cfg *config) *pingStats {
 	// The line with times only shows up if at least one reply was received.
 	if rx > 0.0 {
 		if tm := timeRegexp.FindStringSubmatch(string(out)); tm == nil {
-			cfg.Logger.Printf("Didn't find ping times in %q", string(out))
+			cfg.logger.Printf("Didn't find ping times in %q", string(out))
 			s.commandFailed = true
 			return s
 		} else if times, err := parseFloats(strings.Split(tm[1], "/")); err != nil {
-			cfg.Logger.Printf("Failed to parse ping times from %q: %v", tm[1], err)
+			cfg.logger.Printf("Failed to parse ping times from %q: %v", tm[1], err)
 			s.commandFailed = true
 			return s
 		} else if len(times) != 4 {
-			cfg.Logger.Printf("Expected 4 ping times from %q; got %v", tm[1], len(times))
+			cfg.logger.Printf("Expected 4 ping times from %q; got %v", tm[1], len(times))
 			s.commandFailed = true
 			return s
 		} else {
