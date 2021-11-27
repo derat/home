@@ -12,7 +12,7 @@ import (
 
 	"github.com/derat/home/common"
 
-	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/v2/datastore"
 )
 
 func summariesToString(sums []summary) string {

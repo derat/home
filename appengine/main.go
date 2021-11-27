@@ -18,9 +18,9 @@ import (
 	"github.com/derat/home/appengine/storage"
 	"github.com/derat/home/common"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/user"
+	"google.golang.org/appengine/v2"
+	"google.golang.org/appengine/v2/log"
+	"google.golang.org/appengine/v2/user"
 )
 
 const (

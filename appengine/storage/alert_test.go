@@ -12,7 +12,7 @@ import (
 
 	"github.com/derat/home/common"
 
-	"google.golang.org/appengine/mail"
+	"google.golang.org/appengine/v2/mail"
 )
 
 func TestGetSamplesForConditions(t *testing.T) {

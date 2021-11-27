@@ -11,9 +11,9 @@ import (
 
 	"github.com/derat/home/common"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/aetest"
-	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/v2"
+	"google.golang.org/appengine/v2/aetest"
+	"google.golang.org/appengine/v2/datastore"
 )
 
 var testLoc *time.Location
