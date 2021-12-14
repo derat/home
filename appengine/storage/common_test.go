@@ -71,17 +71,20 @@ func checkSamples(t *testing.T, c context.Context, expected []common.Sample) {
 }
 
 func TestMain(m *testing.M) {
-	var err error
-	testLoc, err = time.LoadLocation("America/Los_Angeles")
-	if err != nil {
-		panic(err)
-	}
-
-	defer func() {
-		if testInst != nil {
-			testInst.Close()
+	result := func() int {
+		var err error
+		testLoc, err = time.LoadLocation("America/Los_Angeles")
+		if err != nil {
+			panic(err)
 		}
-	}()
 
-	os.Exit(m.Run())
+		defer func() {
+			if testInst != nil {
+				testInst.Close()
+			}
+		}()
+
+		return m.Run()
+	}()
+	os.Exit(result)
 }
