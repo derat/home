@@ -7,7 +7,3 @@ steps:
         apt-get update
         apt-get install -y golang
         go test -v ./...
-
-tags:
-  - commit-$COMMIT_SHA
-  - trigger-name-$TRIGGER_NAME
