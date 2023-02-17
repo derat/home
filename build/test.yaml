@@ -6,5 +6,8 @@ steps:
       - '-c'
       - |
         apt-get update
-        apt-get install -y golang
+        # I can't figure out how to convince dev_appserver to use python3,
+        # so install python2 so it doesn't fail with "python2: command not
+        # found".
+        apt-get install -y golang iputils-ping python2
         go test -v ./...
