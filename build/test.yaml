@@ -2,6 +2,7 @@ steps:
   - name: google/cloud-sdk:latest
     entrypoint: bash
     args:
+      - '-e'
       - '-c'
       - |
         apt-get update
